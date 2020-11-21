@@ -9,7 +9,7 @@ according to those terms.
 import math
 from ortools.graph import pywrapgraph
 import sys
-
+import cv2
 import tools
 
 
@@ -21,13 +21,14 @@ class MinCostFlowTracker:
 		CVPR 2008
 	"""
 
-	def __init__(self, detections, tags, min_thresh, P_enter, P_exit, beta):
+	# def __init__(self, detections, tags, min_thresh, P_enter, P_exit, beta):
+	def __init__(self, detections, tags, min_thresh, P_enter, P_exit):
 		self._detections = detections
 		self._min_thresh = min_thresh
 
 		self.P_enter = P_enter
 		self.P_exit = self.P_enter
-		self.beta = beta
+		# self.beta = beta
 
 		self._id2name = tools.map_id2name(tags)
 		self._name2id = tools.map_name2id(tags)
@@ -57,34 +58,65 @@ class MinCostFlowTracker:
 	def _calc_cost_detection(self, beta):
 		return math.log(beta / (1.0 - beta))
 
-	def _calc_cost_link(self, rect1, rect2, image1=None, image2=None, eps=1e-7):
-		prob_iou = tools.calc_overlap(rect1, rect2)
+	def _calc_cost_link(self, rect1, rect2, cI, rI, imageList1=None, imageList2=None, dbgLog=False, eps=1e-7):
+		image1 = imageList1[cI]
+		image2 = imageList2[rI]
+
+		prob_iou = tools.calc_overlap(rect1, rect2, dbgLog)
 		hist1 = tools.calc_HS_histogram(image1, rect1)
 		hist2 = tools.calc_HS_histogram(image2, rect2)
 		prob_color = 1.0 - tools.calc_bhattacharyya_distance(hist1, hist2)
 
+		# if dbgLog == True:
+		# 	print (prob_iou, prob_color)
+
 		prob_sim = prob_iou * prob_color
 		return -math.log(prob_sim + eps)
 
-	def build_network(self, images={}, f2i_factor=10000):
+	def build_network(self, images={}, f2i_factor=1000):
 		self.mcf = pywrapgraph.SimpleMinCostFlow()
 
-		for image_name, rects in sorted(self._detections.items()):
+		for image_name, rects in sorted(self._detections.items(), key=lambda t: tools.get_key(t[0])):
+			f2i_en = 1000000
+			f2i_ex = 1000000
+
+			if image_name == "1":
+				f2i_en = 10
+			elif image_name == "99":
+				f2i_ex = 10
+
 			for i, rect in enumerate(rects):
-				self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_factor))
+				self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_en))
 				self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "u")], self._node2id[(image_name, i, "v")], 1, int(self._calc_cost_detection(rect[4]) * f2i_factor))
-				self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "v")], self._node2id["sink"], 1, int(self._calc_cost_exit() * f2i_factor))
+				self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "v")], self._node2id["sink"], 1, int(self._calc_cost_exit() * f2i_ex))
 
 			frame_id = self._name2id[image_name]
+			
 			if frame_id == 0:
 				continue
+
 			prev_image_name = self._id2name[frame_id - 1]
 			if prev_image_name not in self._detections:
 				continue
-
+			
+			dbgLog = False
 			for i, i_rect in enumerate(self._detections[prev_image_name]):
+				# if image_name == "2" and i == 9:
+				# 	dbgLog = True
+					
+				if dbgLog == True:	
+					cv2.imwrite("./prev_crop.jpg", images[prev_image_name][i])
+
 				for j, j_rect in enumerate(rects):
-					self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_image_name, i, "v")], self._node2id[(image_name, j, "u")], 1, int(self._calc_cost_link(images[prev_image_name], i_rect, images[image_name], j_rect) * 1000))
+					unit_cost = int(self._calc_cost_link(i_rect, j_rect, i, j, images[prev_image_name], images[image_name], dbgLog) * 100)
+
+					if dbgLog == True:
+						cv2.imwrite("./cur_crop_%d.jpg" % (j), images[image_name][j])
+						print (j, unit_cost)
+
+					self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_image_name, i, "v")], self._node2id[(image_name, j, "u")], 1, unit_cost)
+				
+				dbgLog = False
 
 	def _make_flow_dict(self):
 		self.flow_dict = {}
@@ -150,9 +182,10 @@ class MinCostFlowTracker:
 		max_flow = self.mcf.NumNodes() // search_range
 		print("Search: 0 < num_flow <", max_flow)
 
-		optimal_flow = 0
+		optimal_flow = -1
 		optimal_cost = float("inf")
-		for flow in range(max_flow):
+
+		for flow in range(26):
 			self.mcf.SetNodeSupply(self._node2id["source"], flow)
 			self.mcf.SetNodeSupply(self._node2id["sink"], -flow)
 
@@ -162,10 +195,19 @@ class MinCostFlowTracker:
 				print("There was an issue with the min cost flow input.")
 				sys.exit()
 
+			# print ("amount of flow at source: %d / optimal cost: %d" % (flow, cost))
+
+			if flow == 0:
+				continue
+
+			if flow == 25:
+				self._make_flow_dict()
+
 			if cost < optimal_cost:
 				optimal_flow = flow
 				optimal_cost = cost
-				self._make_flow_dict()
+				# self._make_flow_dict()
+				
 		return (optimal_flow, optimal_cost)
 
 	def run(self, fib=False):
