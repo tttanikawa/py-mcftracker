@@ -73,7 +73,7 @@ class MinCostFlowTracker:
 		prob_sim = prob_iou * prob_color
 		return -math.log(prob_sim + eps)
 
-	def build_network(self, images={}, f2i_factor=1000):
+	def build_network(self, images, last_img_name, f2i_factor=10):
 		self.mcf = pywrapgraph.SimpleMinCostFlow()
 
 		for image_name, rects in sorted(self._detections.items(), key=lambda t: tools.get_key(t[0])):
@@ -82,7 +82,7 @@ class MinCostFlowTracker:
 
 			if image_name == "1":
 				f2i_en = 10
-			elif image_name == "99":
+			elif image_name == last_img_name:
 				f2i_ex = 10
 
 			for i, rect in enumerate(rects):
@@ -179,6 +179,7 @@ class MinCostFlowTracker:
 		return (s, optimal_cost)
 
 	def _brute_force(self, search_range=100):
+
 		max_flow = self.mcf.NumNodes() // search_range
 		print("Search: 0 < num_flow <", max_flow)
 
@@ -206,7 +207,6 @@ class MinCostFlowTracker:
 			if cost < optimal_cost:
 				optimal_flow = flow
 				optimal_cost = cost
-				# self._make_flow_dict()
 				
 		return (optimal_flow, optimal_cost)
 
