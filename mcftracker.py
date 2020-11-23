@@ -178,13 +178,13 @@ class MinCostFlowTracker:
 
 	def _brute_force(self, search_range=100):
 
-		max_flow = self.mcf.NumNodes() // search_range
-		print("Search: 0 < num_flow <", max_flow)
+		# max_flow = self.mcf.NumNodes() // search_range
+		# print("Search: 0 < num_flow <", max_flow)
 
 		optimal_flow = -1
 		optimal_cost = float("inf")
 
-		for flow in range(26):
+		for flow in range(22,27):
 			self.mcf.SetNodeSupply(self._node2id["source"], flow)
 			self.mcf.SetNodeSupply(self._node2id["sink"], -flow)
 
@@ -199,12 +199,10 @@ class MinCostFlowTracker:
 			if flow == 0:
 				continue
 
-			if flow == 25:
-				self._make_flow_dict()
-
 			if cost < optimal_cost:
 				optimal_flow = flow
 				optimal_cost = cost
+				self._make_flow_dict()
 				
 		return (optimal_flow, optimal_cost)
 
