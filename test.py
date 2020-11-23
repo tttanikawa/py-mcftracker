@@ -19,7 +19,7 @@ def recursive_get_track(elem, dct, lst):
 		recursive_get_track(k[0][0], dct, lst)
 	return
 
-def main(path2video, path2det):
+def main(path2video, path2det, num_frames):
 	# 1. read from video
 	cap = cv2.VideoCapture(path2video)
 	
@@ -66,7 +66,8 @@ def main(path2video, path2det):
 		images[image_name] = bbimgs
 
 		frame_num = frame_num+1
-		if frame_num == 400:
+		
+		if frame_num == num_frames:
 			break
 	
 	cap.release()
@@ -155,6 +156,7 @@ def visualise_hypothesis(video):
 if __name__ == "__main__":
 	path2video = sys.argv[1]
 	path2det = sys.argv[2]
+	num_frames = int(sys.argv[3])
 
-	main(path2video, path2det)
+	main(path2video, path2det, num_frames)
 	visualise_hypothesis(path2video)

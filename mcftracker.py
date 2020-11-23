@@ -28,7 +28,6 @@ class MinCostFlowTracker:
 
 		self.P_enter = P_enter
 		self.P_exit = self.P_enter
-		# self.beta = beta
 
 		self._id2name = tools.map_id2name(tags)
 		self._name2id = tools.map_name2id(tags)
@@ -196,7 +195,7 @@ class MinCostFlowTracker:
 				print("There was an issue with the min cost flow input.")
 				sys.exit()
 
-			# print ("amount of flow at source: %d / optimal cost: %d" % (flow, cost))
+			print ("amount of flow at source: %d / optimal cost: %d" % (flow, cost))
 
 			if flow == 0:
 				continue
