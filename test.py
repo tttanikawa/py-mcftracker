@@ -19,6 +19,15 @@ def recursive_get_track(elem, dct, lst):
 		recursive_get_track(k[0][0], dct, lst)
 	return
 
+def loop_get_track(elem, dct):
+	lst = []
+	# while dict has key
+	while elem in dct:
+		lst.append(elem)
+		elem = dct[elem].items()[0][0]
+	return lst
+
+
 def main(path2video, path2det, max_frame):
 	# 1. read from video
 	cap = cv2.VideoCapture(path2video)
@@ -32,6 +41,8 @@ def main(path2video, path2det, max_frame):
 	images = {}
 	frame_num = 0
 	
+	print ('# starting to read input frames & detection data')
+
 	while(cap.isOpened()):
 		_, frame = cap.read()
 
@@ -70,6 +81,8 @@ def main(path2video, path2det, max_frame):
 		if frame_num == max_frame:
 			break
 	
+	print ('# starting to execute main algorithm')
+	
 	cap.release()
 
 	# Parameters
@@ -93,10 +106,8 @@ def main(path2video, path2det, max_frame):
 	log_file = open(log_filename, 'w')
 	
 	track_hypot = []
-	for k,v in tracker.flow_dict["source"].items():
-		track_lst = []
-		recursive_get_track(k, tracker.flow_dict, track_lst)
-		track_hypot.append(track_lst)
+	for k,_ in tracker.flow_dict["source"].items():
+		track_hypot.append(loop_get_track(k, tracker.flow_dict))
 
 	id = 0
 	for track in track_hypot:
@@ -112,7 +123,6 @@ def main(path2video, path2det, max_frame):
 
 	# for c in [0.1, 0.2, 0.3, 0.4, 0.7, 0.9, 0.99]:
 	# 	print ('score %f -> cost det: %d' % (c, int(tracker._calc_cost_detection(c) * 10)))
-
 
 def visualise_hypothesis(video):
 	cap = cv2.VideoCapture(video)
