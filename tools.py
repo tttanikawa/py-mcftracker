@@ -69,16 +69,13 @@ def map_id2name(tags):
 
 
 def calc_overlap(bb1, bb2, dbg=False):
-	bi = (max(bb1[0], bb2[0]), max(bb1[1], bb2[1]), min(bb1[2], bb2[2]), min(bb1[3], bb2[3]))
-	iw = bi[2] - bi[0] + 1
-	ih = bi[3] - bi[1] + 1
+	# iw = bi[2] - bi[0] + 1
+	# ih = bi[3] - bi[1] + 1
 	
-	if iw > 0 and ih > 0:
-		ua = (bb1[2] - bb1[0] + 1) * (bb1[3] - bb1[1] + 1) + (bb2[2] - bb2[0] + 1) * (bb2[3] - bb2[1] + 1) - iw * ih
-
-		# if dbg == True:
-		# 	print (iw, ih, ua)
-
-		return iw * ih / ua
-	else:
-		return 0.0
+	# if dbg == True:
+		# print (iw, ih)
+	bi = (max(bb1[0], bb2[0]), max(bb1[1], bb2[1]), min(bb1[2], bb2[2]), min(bb1[3], bb2[3]))
+	iw = max(0., bi[2] - bi[0] + 1)
+	ih = max(0., bi[3] - bi[1] + 1)
+	ua = (bb1[2] - bb1[0] + 1) * (bb1[3] - bb1[1] + 1) + (bb2[2] - bb2[0] + 1) * (bb2[3] - bb2[1] + 1) - iw * ih
+	return iw * ih / float(ua)

@@ -19,7 +19,7 @@ def recursive_get_track(elem, dct, lst):
 		recursive_get_track(k[0][0], dct, lst)
 	return
 
-def main(path2video, path2det, num_frames):
+def main(path2video, path2det, max_frame):
 	# 1. read from video
 	cap = cv2.VideoCapture(path2video)
 	
@@ -66,8 +66,8 @@ def main(path2video, path2det, num_frames):
 		images[image_name] = bbimgs
 
 		frame_num = frame_num+1
-		
-		if frame_num == num_frames:
+
+		if frame_num == max_frame:
 			break
 	
 	cap.release()
@@ -110,13 +110,13 @@ def main(path2video, path2det, num_frames):
 				l = str(f) + "," + str(id) + "," + str(b[0]) + "," + str(b[1]) + "," + str(b[2]) + "," + str(b[3]) + "\n"
 				log_file.write(l)
 
+	# for c in [0.1, 0.2, 0.3, 0.4, 0.7, 0.9, 0.99]:
+	# 	print ('score %f -> cost det: %d' % (c, int(tracker._calc_cost_detection(c) * 10)))
+
 
 def visualise_hypothesis(video):
 	cap = cv2.VideoCapture(video)
 	
-	# frame_width = int(cap.get(3))
-	# frame_height = int(cap.get(4))
-
 	hypothesis = np.loadtxt("./hypothesis.txt", delimiter=',')
 	frame_indices = hypothesis[:, 0].astype(np.int)
 
@@ -150,8 +150,6 @@ def visualise_hypothesis(video):
 
 	cap.release()
 	vout.release()
-
-		# cv2.imwrite("./test.jpg", frame)
 
 if __name__ == "__main__":
 	path2video = sys.argv[1]

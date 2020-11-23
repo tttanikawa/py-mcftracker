@@ -21,7 +21,6 @@ class MinCostFlowTracker:
 		CVPR 2008
 	"""
 
-	# def __init__(self, detections, tags, min_thresh, P_enter, P_exit, beta):
 	def __init__(self, detections, tags, min_thresh, P_enter, P_exit):
 		self._detections = detections
 		self._min_thresh = min_thresh
@@ -72,7 +71,7 @@ class MinCostFlowTracker:
 		prob_sim = prob_iou * prob_color
 		return -math.log(prob_sim + eps)
 
-	def build_network(self, images, last_img_name, f2i_factor=10):
+	def build_network(self, images, last_img_name, f2i_factor=100):
 		self.mcf = pywrapgraph.SimpleMinCostFlow()
 
 		for image_name, rects in sorted(self._detections.items(), key=lambda t: tools.get_key(t[0])):
@@ -86,7 +85,7 @@ class MinCostFlowTracker:
 
 			for i, rect in enumerate(rects):
 				self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_en))
-				self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "u")], self._node2id[(image_name, i, "v")], 1, int(self._calc_cost_detection(rect[4]) * f2i_factor))
+				self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "u")], self._node2id[(image_name, i, "v")], 1, int(self._calc_cost_detection(1.0-rect[4]) * f2i_factor))
 				self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "v")], self._node2id["sink"], 1, int(self._calc_cost_exit() * f2i_ex))
 
 			frame_id = self._name2id[image_name]
