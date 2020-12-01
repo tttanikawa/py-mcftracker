@@ -56,7 +56,7 @@ class MinCostFlowTracker:
 	def _calc_cost_detection(self, beta):
 		return math.log(beta / (1.0 - beta))
 
-	def _calc_cost_link(self, rect1, rect2, cI, rI, imageList1=None, imageList2=None, dbgLog=False, eps=1e-7):
+	def _calc_cost_link(self, rect1, rect2, cI, rI, imageList1=None, imageList2=None, dbgLog=False, eps=1e-9):
 		image1 = imageList1[cI]
 		image2 = imageList2[rI]
 
@@ -67,16 +67,21 @@ class MinCostFlowTracker:
 
 		# if dbgLog == True:
 		# 	print (prob_iou, prob_color)
-
-		prob_sim = prob_iou * prob_color
-		return -math.log(prob_sim + eps)
+		if prob_color != 0. and prob_iou != 0.:
+			prob_sim = prob_iou * prob_color
+			return -math.log(prob_sim + eps)
+		else:
+			return 1000
 
 	def build_network(self, images, last_img_name, f2i_factor=100):
 		self.mcf = pywrapgraph.SimpleMinCostFlow()
 
 		for image_name, rects in sorted(self._detections.items(), key=lambda t: tools.get_key(t[0])):
-			f2i_en = 1000000
-			f2i_ex = 1000000
+			# f2i_en = 1000000
+			# f2i_ex = 1000000
+
+			f2i_en = 1000
+			f2i_ex = 1000
 
 			if image_name == "1":
 				f2i_en = 10
@@ -184,7 +189,7 @@ class MinCostFlowTracker:
 		optimal_flow = -1
 		optimal_cost = float("inf")
 
-		for flow in range(22,27):
+		for flow in range(22,40):
 			self.mcf.SetNodeSupply(self._node2id["source"], flow)
 			self.mcf.SetNodeSupply(self._node2id["sink"], -flow)
 

@@ -27,7 +27,6 @@ def loop_get_track(elem, dct):
 		elem = dct[elem].items()[0][0]
 	return lst
 
-
 def main(path2video, path2det, max_frame):
 	# 1. read from video
 	cap = cv2.VideoCapture(path2video)
@@ -105,57 +104,88 @@ def main(path2video, path2det, max_frame):
 	log_filename = './hypothesis.txt'
 	log_file = open(log_filename, 'w')
 	
-	track_hypot = []
-	for k,_ in tracker.flow_dict["source"].items():
-		track_hypot.append(loop_get_track(k, tracker.flow_dict))
+	tr_end = []
+	tr_bgn = []
 
-	id = 0
-	for track in track_hypot:
-		id = id + 1
+	track_hypot = []
+	for n, (k,_) in enumerate(tracker.flow_dict["source"].items()):
+		# print (k, n)
+		tr_lst = loop_get_track(k, tracker.flow_dict)
+		track_hypot.append(tr_lst)
+
+		s_node = tr_lst[0]
+		t_node = tr_lst[-1]
+
+		if s_node[0] != '1':
+			tr_bgn.append(n)
+
+		if t_node[0] != str(max_frame-1):
+			tr_end.append(n)
+
+	# print (tr_bgn)
+	# print (tr_end)
+
+	print ('tracks not finished at sink')
+	for index in tr_end:
+		print('track index %d finished at frame %s' % (index+1, track_hypot[index][-1]))
+
+	print ('tracks not started at source')
+	for index in tr_bgn:
+		print('track index %d started at frame %s' % ((index+1)*int(track_hypot[index][0][0]), track_hypot[index][0]))
+		
+	for id, track in enumerate(track_hypot):
+		mf = int(track[0][0])
 		for i, t in enumerate(track):
 			if i % 2 == 0:
 				bi = int(t[1])
 				b = detections[t[0]][bi]
 				f = int(t[0])
 
-				l = str(f) + "," + str(id) + "," + str(b[0]) + "," + str(b[1]) + "," + str(b[2]) + "," + str(b[3]) + "\n"
+				l = str(f) + "," + str(mf*(id+1)) + "," + str(b[0]) + "," + str(b[1]) + "," + str(b[2]) + "," + str(b[3]) + "\n"
 				log_file.write(l)
 
+	
 	# for c in [0.1, 0.2, 0.3, 0.4, 0.7, 0.9, 0.99]:
 	# 	print ('score %f -> cost det: %d' % (c, int(tracker._calc_cost_detection(c) * 10)))
 
-def visualise_hypothesis(video):
+def visualise_hypothesis(video, path2det):
 	cap = cv2.VideoCapture(video)
 	
 	hypothesis = np.loadtxt("./hypothesis.txt", delimiter=',')
+	detections = np.loadtxt(path2det, delimiter=',')
+
 	frame_indices = hypothesis[:, 0].astype(np.int)
+	frame_indices_dets = detections[:, 0].astype(np.int)
 
 	min_frame_idx = frame_indices.astype(np.int).min()
 	max_frame_idx = frame_indices.astype(np.int).max()
 	
-	# fourcc = cv2.VideoWriter_fourcc(*'H264')
-	# vout = cv2.VideoWriter("./out.mp4", fourcc, 30, (frame_width, frame_height))
-	# vout = cv2.VideoWriter('./out.avi', -1, 10, (frame_width,frame_height))
-	# vout = cv2.VideoWriter('./out.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 25, (frame_width,frame_height))
-
 	out_size = (2400, 600)
 	vout = cv2.VideoWriter('./out.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 30, out_size)
 
 	for frame_idx in range(min_frame_idx, max_frame_idx + 1):
 		print("Frame %05d/%05d" % (frame_idx, max_frame_idx))
 
-		mask = frame_indices == frame_idx
-		rows = hypothesis[mask]
+		mask_h = frame_indices == frame_idx
+		mask_d = frame_indices_dets == frame_idx
+		
+		rows = hypothesis[mask_h]
+		dets = detections[mask_d]
 
 		_, frame = cap.read()
 
 		cv2.putText(frame, str(frame_idx), (150, 200), cv2.FONT_HERSHEY_PLAIN, 4, (0,0,255), 4)
 
-		for r in rows:
+		for r in rows:	
 			tid, x1, y1, x2, y2 = int(r[1]), int(r[2]), int(r[3]), int(r[4]), int(r[5])
 			cv2.putText(frame, str(tid), (x1, y1), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,255), 2)
 			# cv2.rectangle(frame, (x1, y1), (x2, y2), (255,255,0), 2)
 		
+		for d in dets:	
+			_, x1, y1, x2, y2,_ = int(d[0]), int(d[1]), int(d[2]), int(d[3]), int(d[4]), int(d[5])
+			# cv2.rectangle(frame, (x1, y1), (x2, y2), (0,255,0), 2)
+			cv2.circle(frame, (x1+int((x2-x1)/2), y1+int((y2-y1)/2)), 2, (0,0,255), 5)
+
 		vout.write(cv2.resize(frame, out_size))
 
 	cap.release()
@@ -167,4 +197,4 @@ if __name__ == "__main__":
 	num_frames = int(sys.argv[3])
 
 	main(path2video, path2det, num_frames)
-	visualise_hypothesis(path2video)
+	visualise_hypothesis(path2video, path2det)
