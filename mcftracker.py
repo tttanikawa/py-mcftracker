@@ -77,9 +77,6 @@ class MinCostFlowTracker:
 		self.mcf = pywrapgraph.SimpleMinCostFlow()
 
 		for image_name, rects in sorted(self._detections.items(), key=lambda t: tools.get_key(t[0])):
-			# f2i_en = 1000000
-			# f2i_ex = 1000000
-
 			f2i_en = 1000
 			f2i_ex = 1000
 
