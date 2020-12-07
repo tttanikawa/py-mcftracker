@@ -28,7 +28,6 @@ def loop_get_track(elem, dct):
 	# while dict has key
 	while elem in dct:
 		lst.append(elem)
-		# elem = dct[elem].items()[0][0]
 		elem = list(dct[elem].keys())[0]
 	return lst
 
@@ -41,7 +40,7 @@ def calc_eucl_dist(det1, det2):
 	dist = np.linalg.norm(pt1_np-pt2_np)
 	return dist
 
-def compute_cost(cur_patch, ref_patch, cur_box, ref_box, a=1., b=10, inf=1e6):
+def compute_cost(cur_patch, ref_patch, cur_box, ref_box, a=1., b=20, inf=1e6):
 	hist1 = tools.calc_HS_histogram(cur_patch, None)
 	hist2 = tools.calc_HS_histogram(ref_patch, None)
 	
@@ -76,7 +75,6 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, images, detections, inf=
 
 def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, images, detections):
 	cost = cost_matrix(hypothesis, hypothesis_t, hypothesis_s, images, detections)
-	print (cost)
 	
 	# assignment
 	row_ind, col_ind = linear_sum_assignment(cost)
@@ -89,6 +87,13 @@ def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, images, 
 						int(hypothesis[hypothesis_t[r]][-1][0]), int(hypothesis[hypothesis_s[c]][0][0]), cost[r][c]))
 			matches.append((hypothesis_t[r], hypothesis_s[c]))
 
+	print ('matches before sorting ==>')
+	print (matches)
+	# sort matches in descending order of hypothesis_s
+	matches.sort(key=lambda tup: tup[1], reverse=True)
+	print ('matches after sorting ==>')
+	print (matches)
+
 	# combining two tracks	
 	for s,e in matches:
 		for node in hypothesis[e]:
@@ -100,9 +105,7 @@ def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, images, 
 
 	return
 
-def main(path2video, path2det, start_frame, stop_frame):
-	# 1. read from video
-	
+def main(path2video, path2det, start_frame, stop_frame):	
 	# 2. read detection file
 	det_in = np.loadtxt(path2det, delimiter=',')
 	frame_indices = det_in[:, 0].astype(np.int)
@@ -114,7 +117,6 @@ def main(path2video, path2det, start_frame, stop_frame):
 	print ('# starting to read input frames & detection data')
 
 	vidcap = cv2.VideoCapture(path2video)
-	count = 0
 	success = True
 
 	while success and vidcap.get(cv2.CAP_PROP_POS_FRAMES) < start_frame:
@@ -128,6 +130,9 @@ def main(path2video, path2det, start_frame, stop_frame):
 		if frame_num == 0:
 			frame_num = frame_num + 1
 			continue
+
+		if frame_num % 100 == 0:
+			print ('-> reading frame #%d' % (frame_num))
 
 		mask = frame_indices == frame_num
 		rows = det_in[mask]
@@ -156,7 +161,7 @@ def main(path2video, path2det, start_frame, stop_frame):
 		images[image_name] = bbimgs
 
 		frame_num = frame_num+1
-
+	
 	print ('# starting to execute main algorithm')
 	
 	vidcap.release()
@@ -169,7 +174,9 @@ def main(path2video, path2det, start_frame, stop_frame):
 
 	start = time.time()
 	tracker = MinCostFlowTracker(detections, tags, min_thresh, P_enter, P_exit)
+	print ('-> start building min cost flow graph')
 	tracker.build_network(images, str(frame_num-1))
+	print ('-> finish building min cost flow graph')
 	optimal_flow, optimal_cost = tracker.run(fib=fib_search)
 	end = time.time()
 
@@ -185,18 +192,23 @@ def main(path2video, path2det, start_frame, stop_frame):
 	tr_bgn = []
 
 	track_hypot = []
+	
+	start_offset = str(start_frame+1) if start_frame == 0 else str(start_frame) 
+	end_offset = str(stop_frame)
+
+	print ('-> offset interval [%s-%s]' % (start_offset, end_offset))
+
 	for n, (k,_) in enumerate(tracker.flow_dict["source"].items()):
-		# print (k, n)
 		tr_lst = loop_get_track(k, tracker.flow_dict)
 		track_hypot.append(tr_lst)
 
 		s_node = tr_lst[0]
 		t_node = tr_lst[-1]
 
-		if s_node[0] != '1':
+		if s_node[0] != start_offset:
 			tr_bgn.append(n)
 
-		if t_node[0] != str(stop_frame):
+		if t_node[0] != end_offset:
 			tr_end.append(n)
 
 	print ('tracks not finished at sink')
@@ -210,7 +222,6 @@ def main(path2video, path2det, start_frame, stop_frame):
 	temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, images, detections)
 
 	for id, track in enumerate(track_hypot):
-		# mf = int(track[0][0])
 		mf = 1
 		for i, t in enumerate(track):
 			if i % 2 == 0:
@@ -242,7 +253,9 @@ def visualise_hypothesis(video, path2det, num_skip_frames):
 		success, frame = cap.read()
 
 	for frame_idx in range(min_frame_idx, max_frame_idx + 1):
-		print("Frame %05d/%05d" % (frame_idx, max_frame_idx))
+
+		if frame_idx % 100 == 0:
+			print("Frame %05d/%05d" % (frame_idx, max_frame_idx))
 
 		mask_h = frame_indices == frame_idx
 		mask_d = frame_indices_dets == frame_idx
@@ -260,7 +273,7 @@ def visualise_hypothesis(video, path2det, num_skip_frames):
 		
 		for d in dets:	
 			_, x1, y1, x2, y2,_ = int(d[0]), int(d[1]), int(d[2]), int(d[3]), int(d[4]), int(d[5])
-			cv2.circle(frame, (x1+int((x2-x1)/2), y1+int((y2-y1)/2)), 2, (0,0,255), 5)
+			cv2.circle(frame, (x1+int((x2-x1)/2), y1+int((y2-y1)/2)), 2, (255,0,0), 5)
 
 		vout.write(cv2.resize(frame, out_size))
 
