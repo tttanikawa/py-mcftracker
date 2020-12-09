@@ -15,6 +15,7 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 
 import tools
+import mmcv
 
 def recursive_get_track(elem, dct, lst):
 	if elem in dct:
@@ -105,39 +106,37 @@ def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, images, 
 
 	return
 
-def main(path2video, path2det, start_frame, stop_frame):	
-	# 2. read detection file
-	det_in = np.loadtxt(path2det, delimiter=',')
-	frame_indices = det_in[:, 0].astype(np.int)
-
+def main(path2video, path2det, frame_offset, frame_count, iid):	
 	detections = {}
 	tags = {}
 	images = {}
 	
 	print ('# starting to read input frames & detection data')
 
-	vidcap = cv2.VideoCapture(path2video)
-	success = True
+	det_in = np.loadtxt(path2det, delimiter=',')
+	frame_indices = det_in[:, 0].astype(np.int)
+	min_frame_idx = frame_indices.astype(np.int).min()
+	max_frame_idx = frame_indices.astype(np.int).max()
 
-	while success and vidcap.get(cv2.CAP_PROP_POS_FRAMES) < start_frame:
-		success, frame = vidcap.read()
+	slice_start = 0 if frame_offset == 0 else frame_offset-1
+	slice_end = min(frame_offset+frame_count, frame_offset+max_frame_idx)
 
-	frame_num = start_frame
+	video = mmcv.VideoReader(path2video)
 
-	while success and vidcap.get(cv2.CAP_PROP_POS_FRAMES) <= stop_frame:
-		success, frame = vidcap.read()
-		
-		if frame_num == 0:
-			frame_num = frame_num + 1
-			continue
+	for index in range(slice_start, slice_end):
+		frame = video[index]
 
-		if frame_num % 100 == 0:
-			print ('-> reading frame #%d' % (frame_num))
+		# if index == 0:
+		# 	continue
 
-		mask = frame_indices == frame_num
+		if (index+1) % 500 == 0:
+			print ('-> reading frame %d / %d' % (index+1, slice_end))
+
+		mask = frame_indices == (index - slice_start + 1)
 		rows = det_in[mask]
 
-		image_name = "%d" % (frame_num)
+		# image_name = "%d" % (index)
+		image_name = "%d" % (index+1)
 
 		bboxes = []
 		bbtags = []
@@ -159,13 +158,9 @@ def main(path2video, path2det, start_frame, stop_frame):
 		detections[image_name] = bboxes
 		tags[image_name] = bbtags
 		images[image_name] = bbimgs
-
-		frame_num = frame_num+1
 	
 	print ('# starting to execute main algorithm')
 	
-	vidcap.release()
-
 	# Parameters
 	min_thresh = 0
 	P_enter = 0.1
@@ -175,7 +170,8 @@ def main(path2video, path2det, start_frame, stop_frame):
 	start = time.time()
 	tracker = MinCostFlowTracker(detections, tags, min_thresh, P_enter, P_exit)
 	print ('-> start building min cost flow graph')
-	tracker.build_network(images, str(frame_num-1))
+	first_img_name = 1 if slice_start == 0 else slice_start
+	tracker.build_network(images, str(first_img_name), str(slice_end-1))
 	print ('-> finish building min cost flow graph')
 	optimal_flow, optimal_cost = tracker.run(fib=fib_search)
 	end = time.time()
@@ -193,10 +189,10 @@ def main(path2video, path2det, start_frame, stop_frame):
 
 	track_hypot = []
 	
-	start_offset = str(start_frame+1) if start_frame == 0 else str(start_frame) 
-	end_offset = str(stop_frame)
+	source_idx = str(slice_start+1) if slice_start == 0 else str(slice_start) 
+	sink_idx = str(slice_end)
 
-	print ('-> offset interval [%s-%s]' % (start_offset, end_offset))
+	print ('-> offset interval [%s-%s]' % (source_idx, sink_idx))
 
 	for n, (k,_) in enumerate(tracker.flow_dict["source"].items()):
 		tr_lst = loop_get_track(k, tracker.flow_dict)
@@ -205,10 +201,10 @@ def main(path2video, path2det, start_frame, stop_frame):
 		s_node = tr_lst[0]
 		t_node = tr_lst[-1]
 
-		if s_node[0] != start_offset:
+		if s_node[0] != source_idx:
 			tr_bgn.append(n)
 
-		if t_node[0] != end_offset:
+		if t_node[0] != sink_idx:
 			tr_end.append(n)
 
 	print ('tracks not finished at sink')
@@ -222,18 +218,18 @@ def main(path2video, path2det, start_frame, stop_frame):
 	temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, images, detections)
 
 	for id, track in enumerate(track_hypot):
-		mf = 1
 		for i, t in enumerate(track):
 			if i % 2 == 0:
 				bi = int(t[1])
 				b = detections[t[0]][bi]
 				f = int(t[0])
 
-				l = str(f) + "," + str(mf*(id+1)) + "," + str(b[0]) + "," + str(b[1]) + "," + str(b[2]) + "," + str(b[3]) + "\n"
+				l = str(f) + "," + str((iid-1)*10000+(id+1)) + "," + str(b[0]) + "," + str(b[1]) + "," + str(b[2]) + "," + str(b[3]) + "\n"
 				log_file.write(l)
+
 	return
 
-def visualise_hypothesis(video, path2det, num_skip_frames):
+def visualise_hypothesis(path2video, path2det, frame_offset, frame_count):
 	hypothesis = np.loadtxt("./hypothesis.txt", delimiter=',')
 	detections = np.loadtxt(path2det, delimiter=',')
 
@@ -243,29 +239,27 @@ def visualise_hypothesis(video, path2det, num_skip_frames):
 	min_frame_idx = frame_indices.astype(np.int).min()
 	max_frame_idx = frame_indices.astype(np.int).max()
 	
-	out_size = (2400, 600)
-	vout = cv2.VideoWriter('./out.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 30, out_size)
+	out_size = (1800, 600)
+	vout = cv2.VideoWriter('./out.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 25, out_size)
 
-	cap = cv2.VideoCapture(video)
+	video = mmcv.VideoReader(path2video)
 
-	success = True
-	while success and cap.get(cv2.CAP_PROP_POS_FRAMES) < num_skip_frames:
-		success, frame = cap.read()
+	slice_start = 0 if frame_offset == 0 else frame_offset-1
+	slice_end = min(frame_offset+frame_count, frame_offset+max_frame_idx)
 
-	for frame_idx in range(min_frame_idx, max_frame_idx + 1):
+	for frame_idx in range(slice_start, slice_end):
+		frame = video[frame_idx]
+		
+		if (frame_idx+1) % 500 == 0:
+			print("Frame %05d/%05d" % (frame_idx+1, slice_end))
 
-		if frame_idx % 100 == 0:
-			print("Frame %05d/%05d" % (frame_idx, max_frame_idx))
-
-		mask_h = frame_indices == frame_idx
-		mask_d = frame_indices_dets == frame_idx
+		mask_h = frame_indices == (frame_idx - slice_start + 1)
+		mask_d = frame_indices_dets == (frame_idx - slice_start + 1)
 		
 		rows = hypothesis[mask_h]
 		dets = detections[mask_d]
 
-		_, frame = cap.read()
-
-		cv2.putText(frame, str(frame_idx), (150, 200), cv2.FONT_HERSHEY_PLAIN, 4, (0,0,255), 4)
+		cv2.putText(frame, str(frame_idx+1), (150, 200), cv2.FONT_HERSHEY_PLAIN, 4, (0,0,255), 4)
 
 		for r in rows:	
 			tid, x1, y1, x2, y2 = int(r[1]), int(r[2]), int(r[3]), int(r[4]), int(r[5])
@@ -277,15 +271,15 @@ def visualise_hypothesis(video, path2det, num_skip_frames):
 
 		vout.write(cv2.resize(frame, out_size))
 
-	cap.release()
 	vout.release()
 
 if __name__ == "__main__":
 	path2video = sys.argv[1]
 	path2det = sys.argv[2]
 
-	start_f = int(sys.argv[3])
-	end_f = int(sys.argv[4])
+	frame_offset = int(sys.argv[3])
+	frame_count = int(sys.argv[4])
+	iid = int(sys.argv[5])
 
-	main(path2video, path2det, start_f, end_f)
-	visualise_hypothesis(path2video, path2det, start_f)
+	main(path2video, path2det, frame_offset, frame_count, iid)
+	visualise_hypothesis(path2video, path2det, frame_offset, frame_count)

@@ -73,14 +73,18 @@ class MinCostFlowTracker:
 		else:
 			return 1000
 
-	def build_network(self, images, last_img_name, f2i_factor=100):
+	def build_network(self, images, first_img_name, last_img_name, f2i_factor=100):
 		self.mcf = pywrapgraph.SimpleMinCostFlow()
 
-		for image_name, rects in sorted(self._detections.items(), key=lambda t: tools.get_key(t[0])):
+		for n, (image_name, rects) in enumerate(sorted(self._detections.items(), key=lambda t: tools.get_key(t[0]))):
+
+			if n % 100 == 0:
+				print ('-> processing image %s / %d' % (image_name, len(self._detections)))
+
 			f2i_en = 1000
 			f2i_ex = 1000
 
-			if image_name == "1":
+			if image_name == first_img_name:
 				f2i_en = 10
 			elif image_name == last_img_name:
 				f2i_ex = 10
@@ -186,7 +190,7 @@ class MinCostFlowTracker:
 		optimal_flow = -1
 		optimal_cost = float("inf")
 
-		for flow in range(32,55):
+		for flow in range(45,75):
 			self.mcf.SetNodeSupply(self._node2id["source"], flow)
 			self.mcf.SetNodeSupply(self._node2id["sink"], -flow)
 
