@@ -79,7 +79,7 @@ class MinCostFlowTracker:
 		for n, (image_name, rects) in enumerate(sorted(self._detections.items(), key=lambda t: tools.get_key(t[0]))):
 
 			if n % 100 == 0:
-				print ('-> processing image %s / %d' % (image_name, len(self._detections)))
+				print ('-> processing image %s / %s' % (image_name, last_img_name))
 
 			f2i_en = 1000
 			f2i_ex = 1000

@@ -285,7 +285,7 @@ if __name__ == "__main__":
 	iid = int(sys.argv[5])
 	print ('# argv 5 -> instance id: %d' % (iid))
 
-	visualise = False
+	visualise = True
 	main(path2video, path2det, frame_offset, frame_count, iid)
 	
 	if visualise == True:
