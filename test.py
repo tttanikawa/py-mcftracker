@@ -126,16 +126,12 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 	for index in range(slice_start, slice_end):
 		frame = video[index]
 
-		# if index == 0:
-		# 	continue
-
 		if (index+1) % 500 == 0:
-			print ('-> reading frame %d / %d' % (index+1, slice_end))
+			print ('-> read ng frame %d / %d' % (index+1, slice_end))
 
 		mask = frame_indices == (index - slice_start + 1)
 		rows = det_in[mask]
 
-		# image_name = "%d" % (index)
 		image_name = "%d" % (index+1)
 
 		bboxes = []
@@ -281,5 +277,8 @@ if __name__ == "__main__":
 	frame_count = int(sys.argv[4])
 	iid = int(sys.argv[5])
 
+	visualise = False
 	main(path2video, path2det, frame_offset, frame_count, iid)
-	visualise_hypothesis(path2video, path2det, frame_offset, frame_count)
+	
+	if visualise == True:
+		visualise_hypothesis(path2video, path2det, frame_offset, frame_count)
