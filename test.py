@@ -271,11 +271,19 @@ def visualise_hypothesis(path2video, path2det, frame_offset, frame_count):
 
 if __name__ == "__main__":
 	path2video = sys.argv[1]
+	print ('# argv 1 -> path to video file: %s' % (path2video))
+
 	path2det = sys.argv[2]
+	print ('# argv 2 -> path to detection file: %s' % (path2det))
 
 	frame_offset = int(sys.argv[3])
+	print ('# argv 3 -> frame offset: %d' % (frame_offset))
+
 	frame_count = int(sys.argv[4])
+	print ('# argv 4 -> frame count: %d' % (frame_count))
+
 	iid = int(sys.argv[5])
+	print ('# argv 5 -> instance id: %d' % (iid))
 
 	visualise = False
 	main(path2video, path2det, frame_offset, frame_count, iid)
