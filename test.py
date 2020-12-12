@@ -216,7 +216,8 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 	temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, images, detections)
 
 	# sort result by frame number
-	sorted(track_hypot, key=int(itemgetter(0)))
+	# sorted(track_hypot, key=int(itemgetter(0)))
+	sorted(track_hypot, key=lambda x: int(x[0]))
 
 	for id, track in enumerate(track_hypot):
 		for i, t in enumerate(track):
