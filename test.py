@@ -220,6 +220,7 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 	sorted(track_hypot, key=lambda x: int(x[0][0]))
 
 	for id, track in enumerate(track_hypot):
+		print (track)
 		for i, t in enumerate(track):
 			if i % 2 == 0:
 				bi = int(t[1])
