@@ -17,6 +17,8 @@ from scipy.optimize import linear_sum_assignment
 import tools
 import mmcv
 
+from operator import itemgetter
+
 def recursive_get_track(elem, dct, lst):
 	if elem in dct:
 		lst.append(elem)
@@ -212,6 +214,9 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 		print('track index %d started at frame %s' % (index+1, track_hypot[index][0]))
 
 	temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, images, detections)
+
+	# sort result by frame number
+	sorted(track_hypot, key=int(itemgetter(0)))
 
 	for id, track in enumerate(track_hypot):
 		for i, t in enumerate(track):
