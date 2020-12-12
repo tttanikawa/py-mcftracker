@@ -217,7 +217,7 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 
 	# sort result by frame number
 	# sorted(track_hypot, key=int(itemgetter(0)))
-	sorted(track_hypot, key=lambda x: int(x[0][0]))
+	# sorted(track_hypot, key=lambda x: int(x[0][0]))
 
 	for id, track in enumerate(track_hypot):
 		print (track)
