@@ -219,6 +219,7 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 		for id, track in enumerate(track_hypot):
 			for i, t in enumerate(track):
 				if i % 2 == 0:
+					
 					if int(t[0]) == n:
 						bi = int(t[1])
 						b = detections[t[0]][bi]
@@ -226,15 +227,6 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 						
 						log_file.write('%d, %d, %.2f, %.2f, %.2f, %.2f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2], b[3], 1))
 
-	# for id, track in enumerate(track_hypot):
-	# 	for i, t in enumerate(track):
-	# 		if i % 2 == 0:
-	# 			bi = int(t[1])
-	# 			b = detections[t[0]][bi]
-	# 			f = int(t[0]) - frame_offset
-				
-	# 			log_file.write('%d, %d, %.2f, %.2f, %.2f, %.2f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2], b[3], 1))
-	
 	return
 
 def visualise_hypothesis(path2video, path2det, frame_offset, frame_count):
