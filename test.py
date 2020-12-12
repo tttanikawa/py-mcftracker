@@ -218,7 +218,7 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 			if i % 2 == 0:
 				bi = int(t[1])
 				b = detections[t[0]][bi]
-				f = int(t[0])
+				f = int(t[0]) - frame_offset
 
 				l = str(f) + "," + str((iid-1)*10000+(id+1)) + "," + str(b[0]) + "," + str(b[1]) + "," + str(b[2]) + "," + str(b[3]) + "\n"
 				log_file.write(l)
