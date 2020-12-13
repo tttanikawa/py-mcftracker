@@ -225,7 +225,9 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 						b = detections[t[0]][bi]
 						f = int(t[0]) - frame_offset
 						
-						log_file.write('%d, %d, %.2f, %.2f, %.2f, %.2f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2], b[3], 1))
+						# must be in top-left-width-height
+						# log_file.write('%d, %d, %.2f, %.2f, %.2f, %.2f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2], b[3], 1))
+						log_file.write('%d, %d, %.2f, %.2f, %.2f, %.2f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], 1))
 
 	return
 
@@ -262,12 +264,12 @@ def visualise_hypothesis(path2video, path2det, frame_offset, frame_count):
 		cv2.putText(frame, str(frame_idx+1), (150, 200), cv2.FONT_HERSHEY_PLAIN, 4, (0,0,255), 4)
 
 		for r in rows:	
-			tid, x1, y1, x2, y2 = int(r[1]), int(r[2]), int(r[3]), int(r[4]), int(r[5])
+			tid, x1, y1, w, h = int(r[1]), int(r[2]), int(r[3]), int(r[4]), int(r[5])
 			cv2.putText(frame, str(tid), (x1, y1), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,255), 2)
 		
 		for d in dets:	
-			_, x1, y1, x2, y2,_ = int(d[0]), int(d[1]), int(d[2]), int(d[3]), int(d[4]), int(d[5])
-			cv2.circle(frame, (x1+int((x2-x1)/2), y1+int((y2-y1)/2)), 2, (255,0,0), 5)
+			_, x1, y1, w, h,_ = int(d[0]), int(d[1]), int(d[2]), int(d[3]), int(d[4]), int(d[5])
+			cv2.circle(frame, (x1+int(w/2), y1+int(h/2), 2, (255,0,0), 5)
 
 		vout.write(cv2.resize(frame, out_size))
 
