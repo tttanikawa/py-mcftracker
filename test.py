@@ -129,7 +129,7 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 		frame = video[index]
 
 		if (index+1) % 500 == 0:
-			print ('-> read ng frame %d / %d' % (index+1, slice_end))
+			print ('-> reading frame %d / %d' % (index+1, slice_end))
 
 		mask = frame_indices == (index - slice_start + 1)
 		rows = det_in[mask]
@@ -157,6 +157,8 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 		tags[image_name] = bbtags
 		images[image_name] = bbimgs
 	
+	print ('-> %d images have been read & processed' % (len(detections)))
+
 	print ('# starting to execute main algorithm')
 	
 	# Parameters
@@ -219,7 +221,7 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 	for n in range(slice_start, slice_end):
 		for id, track in enumerate(track_hypot):
 			for i, t in enumerate(track):
-				if i % 2 == 0:
+				if i % 2 == 0 or i == len(track)-1:
 					
 					if int(t[0]) == n:
 						bi = int(t[1])
