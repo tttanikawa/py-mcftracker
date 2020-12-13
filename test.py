@@ -257,7 +257,7 @@ def visualise_hypothesis(path2video, path2det, frame_offset, frame_count):
 		frame = video[frame_idx]
 		
 		if (frame_idx+1) % 500 == 0:
-			print("Frame %05d/%05d" % (frame_idx+1, slice_end+1))
+			print("Frame %05d/%05d" % (frame_idx+1, slice_end))
 
 		mask_h = frame_indices == (frame_idx - slice_start + 1)
 		mask_d = frame_indices_dets == (frame_idx - slice_start + 1)
