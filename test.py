@@ -218,10 +218,10 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 
 	temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, images, detections)
 
-	for n in range(slice_start, slice_end):
+	for n in range(slice_start+1, slice_end+1):
 		for id, track in enumerate(track_hypot):
 			for i, t in enumerate(track):
-				if i % 2 == 0 or i == len(track)-1:
+				if i % 2 == 0:
 					
 					if int(t[0]) == n:
 						bi = int(t[1])
@@ -257,7 +257,7 @@ def visualise_hypothesis(path2video, path2det, frame_offset, frame_count):
 		frame = video[frame_idx]
 		
 		if (frame_idx+1) % 500 == 0:
-			print("Frame %05d/%05d" % (frame_idx+1, slice_end))
+			print("Frame %05d/%05d" % (frame_idx+1, slice_end+1))
 
 		mask_h = frame_indices == (frame_idx - slice_start + 1)
 		mask_d = frame_indices_dets == (frame_idx - slice_start + 1)
