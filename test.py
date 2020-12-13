@@ -169,7 +169,8 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 	tracker = MinCostFlowTracker(detections, tags, min_thresh, P_enter, P_exit)
 	print ('-> start building min cost flow graph')
 	first_img_name = 1 if slice_start == 0 else slice_start
-	tracker.build_network(images, str(first_img_name), str(slice_end-1))
+	# tracker.build_network(images, str(first_img_name), str(slice_end-1))
+	tracker.build_network(images, str(first_img_name), str(slice_end))
 	print ('-> finish building min cost flow graph')
 	optimal_flow, optimal_cost = tracker.run(fib=fib_search)
 	end = time.time()
@@ -223,7 +224,8 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 					if int(t[0]) == n:
 						bi = int(t[1])
 						b = detections[t[0]][bi]
-						f = int(t[0]) - frame_offset
+						# f = int(t[0]) - frame_offset
+						f = int(t[0]) if frame_offset == 0 else int(t[0]) - frame_offset + 1
 						
 						# must be in top-left-width-height
 						# log_file.write('%d, %d, %.2f, %.2f, %.2f, %.2f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2], b[3], 1))
