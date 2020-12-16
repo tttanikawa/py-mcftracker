@@ -216,7 +216,7 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 	for index in tr_bgn:
 		print('track index %d started at frame %s' % (index+1, track_hypot[index][0]))
 
-	temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, images, detections)
+	# temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, images, detections)
 
 	for n in range(slice_start+1, slice_end+1):
 		for id, track in enumerate(track_hypot):
