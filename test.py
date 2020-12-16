@@ -275,6 +275,8 @@ def visualise_hypothesis(path2video, path2det, frame_offset, frame_count):
 			_, x1, y1, x2, y2,_ = int(d[0]), int(d[1]), int(d[2]), int(d[3]), int(d[4]), int(d[5])
 			cv2.circle(frame, (x1+int((x2-x1)/2), y1+int((y2-y1)/2)), 2, (255,0,0), 5)
 
+		cv2.putText(frame, '# dets ' + str(len(dets)), (150, 400), cv2.FONT_HERSHEY_PLAIN, 4, (0,255,0), 4)
+
 		vout.write(cv2.resize(frame, out_size))
 
 	vout.release()
