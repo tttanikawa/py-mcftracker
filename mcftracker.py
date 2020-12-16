@@ -71,7 +71,7 @@ class MinCostFlowTracker:
 			prob_sim = prob_iou * prob_color
 			return -math.log(prob_sim + eps)
 		else:
-			return 1000
+			return 10000
 
 	def build_network(self, images, first_img_name, last_img_name, f2i_factor=100):
 		self.mcf = pywrapgraph.SimpleMinCostFlow()
@@ -81,13 +81,13 @@ class MinCostFlowTracker:
 			if n % 100 == 0:
 				print ('-> processing image %s / %s' % (image_name, last_img_name))
 
-			f2i_en = 1000
-			f2i_ex = 1000
+			f2i_en = 500000
+			f2i_ex = 500000
 
 			if image_name == first_img_name:
-				f2i_en = 10
+				f2i_en = 1
 			elif image_name == last_img_name:
-				f2i_ex = 10
+				f2i_ex = 1
 
 			for i, rect in enumerate(rects):
 				self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_en))
