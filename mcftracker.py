@@ -81,8 +81,8 @@ class MinCostFlowTracker:
 			if n % 100 == 0:
 				print ('-> processing image %s / %s' % (image_name, last_img_name))
 
-			f2i_en = 500000
-			f2i_ex = 500000
+			f2i_en = 10000
+			f2i_ex = 10000
 
 			if image_name == first_img_name:
 				f2i_en = 1
@@ -190,7 +190,7 @@ class MinCostFlowTracker:
 		optimal_flow = -1
 		optimal_cost = float("inf")
 
-		for flow in range(45,75):
+		for flow in range(30,45):
 			self.mcf.SetNodeSupply(self._node2id["source"], flow)
 			self.mcf.SetNodeSupply(self._node2id["sink"], -flow)
 
