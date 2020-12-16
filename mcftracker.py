@@ -190,7 +190,7 @@ class MinCostFlowTracker:
 		optimal_flow = -1
 		optimal_cost = float("inf")
 
-		for flow in range(30,45):
+		for flow in range(40,55):
 			self.mcf.SetNodeSupply(self._node2id["source"], flow)
 			self.mcf.SetNodeSupply(self._node2id["sink"], -flow)
 
