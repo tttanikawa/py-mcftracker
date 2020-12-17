@@ -127,6 +127,7 @@ def find_prev_imgbox(box_cur, detections, images, name):
 	prev_index = str(int(name)-1)
 
 	if prev_index not in detections:
+		print (prev_index)
 		print ('[bug] Unreliable box found in the first frame of the chunk')
 		sys.exit()
  
