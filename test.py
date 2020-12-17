@@ -118,7 +118,7 @@ def is_patch_reliable(tlbr, boxes):
 		if cb == tlbr:
 			continue
 
-		if tools.calc_overlap(tlbr[:3], cb[:3]) > 0.4:
+		if tools.calc_overlap(tlbr[:4], cb[:4]) > 0.4:
 			return False
 
 	return True
@@ -135,7 +135,7 @@ def find_prev_imgbox(box_cur, detections, images, name):
 
 	for n, box in enumerate(detections[prev_index]):
 		# x1, y1, x2, y2, s = float(box[0]), float(box[1]), float(box[2]), float(box[3]), float(box[4])
-		iou = tools.calc_overlap(box_cur, box[:3])
+		iou = tools.calc_overlap(box_cur, box[:4])
 		
 		if iou > max_iou:
 			max_iou = iou
@@ -193,7 +193,7 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 				bbimgs.append(imgbox)
 			else:
 				# find closest (distance) reliable patch from previous time step
-				prev_imgbox = find_prev_imgbox((x1, y1, x2, y2), detections, images, image_name)
+				prev_imgbox = find_prev_imgbox(curbox[:4], detections, images, image_name)
 				bbimgs.append(prev_imgbox)
 
 			bboxes.append( curbox )
