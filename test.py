@@ -19,6 +19,63 @@ import mmcv
 
 from operator import itemgetter
 
+def debug_get_patch_by_id(track_num, detections, images):
+	# get hypothesis file
+	# extract all lines with field == track_num
+
+	frame_infos = []
+	with open('./hypothesis.txt') as fp:
+		for line in fp:
+			line_lst = line.split(',')
+
+			if int(line_lst[1]) == track_num:
+				frame_infos.append( ( int(line_lst[0]), float(line_lst[2]), float(line_lst[3]) ) )
+
+	# for fi in frame_infos:
+	# 	print (fi)
+
+	det_indices = []
+	for (frame_num, x, y) in frame_infos:
+		for i,d in enumerate(detections[str(frame_num)]):
+			if d[0] == x and d[1] == y:
+				det_indices.append((frame_num, i))
+				break
+	
+	print (len(det_indices))
+
+	for (frame_num, i) in det_indices:
+		cv2.imwrite('./id_%d_f_%d.jpg' % (track_num, frame_num), images[str(frame_num)][i])
+
+	# hypothesis = np.loadtxt("./hypothesis.txt", delimiter=',')
+	# track_ids = hypothesis[:, 1].astype(np.int)
+
+	# for t in track_ids:
+	# 	print (t)
+
+	# mask = track_ids == track_num
+	# rows = hypothesis[mask]
+
+	# frame_infos = []
+
+	# for r in rows:
+	# 	tid, x1, y1, w, h = int(r[1]), int(r[2]), int(r[3]), int(r[4]), int(r[5])
+	# 	frame_infos.append( ( int(r[0]), float(r[2]), float(r[3]) ) )
+
+	# det_indices = []
+
+	# for (frame_num, x, y) in frame_infos:
+	# 	for i,d in enumerate(detections[str(frame_num)]):
+	# 		# curbox = [x1,y1,x2,y2,s]
+
+	# 		if d[0] == x and d[1] == y:
+	# 			det_indices.append((frame_num, i))
+
+	# for (frame_num, i) in det_indices:
+	# 	cv2.imwrite('id_%d_f_%d.jpg' % (track_num, frame_num), images[str(frame_num)][i])
+
+	return
+
+
 def recursive_get_track(elem, dct, lst):
 	if elem in dct:
 		lst.append(elem)
@@ -110,7 +167,6 @@ def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, images, 
 
 def is_patch_reliable(tlbr, boxes):
 	# calculate iou with all boxes in current frame
-
 	for box in boxes:
 		_, x1, y1, x2, y2, s = int(box[0]), float(box[1]), float(box[2]), float(box[3]), float(box[4]), float(box[5])
 		cb = [x1,y1,x2,y2,s]
@@ -118,18 +174,20 @@ def is_patch_reliable(tlbr, boxes):
 		if cb == tlbr:
 			continue
 
-		if tools.calc_overlap(tlbr[:4], cb[:4]) > 0.4:
+		if tools.calc_overlap(tlbr[:4], cb[:4]) > 0.1:
 			return False
 
 	return True
 	
-def find_prev_imgbox(box_cur, detections, images, name):
+def find_prev_imgbox(box_cur, detections, images, name, frame):
 	prev_index = str(int(name)-1)
 
 	if prev_index not in detections:
 		print (prev_index)
 		print ('[bug] Unreliable box found in the first frame of the chunk')
-		sys.exit()
+		# return frame[int(y1):int(y2), int(x1):int(x2), :]
+		return None, False
+		# sys.exit()
  
 	max_iou_index = -1
 	max_iou = 0.
@@ -143,10 +201,12 @@ def find_prev_imgbox(box_cur, detections, images, name):
 			max_iou_index = n
 
 	if max_iou_index == -1:
+		print (name, prev_index)
 		print ('[bug] No nearby box in previous frame was found!')
-		sys.exit()
+		return None, False
+		# sys.exit()
 
-	return images[prev_index][max_iou_index]
+	return images[prev_index][max_iou_index], True
 
 def main(path2video, path2det, frame_offset, frame_count, iid):	
 	detections = {}
@@ -180,31 +240,33 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 		bbtags = []
 		bbimgs = []
 
-		for r in rows:
+		for n,r in enumerate(rows):
 			_, x1, y1, x2, y2, s = int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])
 
 			# filtering scores less than .51, allowing vals less than .51 causes bug in graph
 			if s < 0.51:
 				continue
 			
+			is_reliable = True
 			curbox = [x1,y1,x2,y2,s]
+			imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
 
-			if is_patch_reliable(curbox, rows):
-				imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
-				bbimgs.append(imgbox)
+			if not is_patch_reliable(curbox, rows):
+				# cv2.imwrite('unreliable_patch_%s_%d.jpg'%(image_name,n), frame[int(y1):int(y2), int(x1):int(x2), :])
+				imgbox, is_reliable = find_prev_imgbox(curbox[:4], detections, images, image_name, frame)
+
+			if is_reliable:	
+				bbimgs.append( imgbox )
+				bboxes.append( curbox )
+				bbtags.append( [x1,y1,x2,y2] )
 			else:
-				# find closest (distance) reliable patch from previous time step
-				prev_imgbox = find_prev_imgbox(curbox[:4], detections, images, image_name)
-				bbimgs.append(prev_imgbox)
-
-			bboxes.append( curbox )
-			bbtags.append( [x1,y1,x2,y2] )
+				print ('outlier box detected')
 
 		# 3. fill in dictionaries
 		detections[image_name] = bboxes
 		tags[image_name] = bbtags
 		images[image_name] = bbimgs
-	
+
 	print ('-> %d images have been read & processed' % (len(detections)))
 
 	print ('# starting to execute main algorithm')
@@ -279,7 +341,11 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 						
 						# must be in top-left-width-height
 						# log_file.write('%d, %d, %.2f, %.2f, %.2f, %.2f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2], b[3], 1))
-						log_file.write('%d, %d, %.2f, %.2f, %.2f, %.2f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], 1))
+						# log_file.write('%d, %d, %.2f, %.2f, %.2f, %.2f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], 1))
+						log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], 1))
+
+
+	debug_get_patch_by_id(13, detections, images)
 
 	return
 
@@ -350,3 +416,4 @@ if __name__ == "__main__":
 	
 	if visualise == True:
 		visualise_hypothesis(path2video, path2det, frame_offset, frame_count)
+
