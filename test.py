@@ -108,6 +108,45 @@ def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, images, 
 
 	return
 
+def is_patch_reliable(tlbr, boxes):
+	# calculate iou with all boxes in current frame
+
+	for box in boxes:
+		_, x1, y1, x2, y2, s = int(box[0]), float(box[1]), float(box[2]), float(box[3]), float(box[4]), float(box[5])
+		cb = [x1,y1,x2,y2,s]
+		
+		if cb == tlbr:
+			continue
+
+		if tools.calc_overlap(tlbr[:3], cb[:3]) > 0.4:
+			return False
+
+	return True
+	
+def find_prev_imgbox(box_cur, detections, images, name):
+	prev_index = str(int(name)-1)
+
+	if prev_index not in detections:
+		print ('[bug] Unreliable box found in the first frame of the chunk')
+		sys.exit()
+ 
+	max_iou_index = -1
+	max_iou = 0.
+
+	for n, box in enumerate(detections[prev_index]):
+		# x1, y1, x2, y2, s = float(box[0]), float(box[1]), float(box[2]), float(box[3]), float(box[4])
+		iou = tools.calc_overlap(box_cur, box[:3])
+		
+		if iou > max_iou:
+			max_iou = iou
+			max_iou_index = n
+
+	if max_iou_index == -1:
+		print ('[bug] No nearby box in previous frame was found!')
+		sys.exit()
+
+	return images[prev_index][max_iou_index]
+
 def main(path2video, path2det, frame_offset, frame_count, iid):	
 	detections = {}
 	tags = {}
@@ -142,14 +181,22 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 
 		for r in rows:
 			_, x1, y1, x2, y2, s = int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])
-			imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
 
 			# filtering scores less than .51, allowing vals less than .51 causes bug in graph
 			if s < 0.51:
 				continue
+			
+			curbox = [x1,y1,x2,y2,s]
 
-			bbimgs.append( imgbox )
-			bboxes.append( [x1,y1,x2,y2,s] )
+			if is_patch_reliable(curbox, rows):
+				imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
+				bbimgs.append(imgbox)
+			else:
+				# find closest (distance) reliable patch from previous time step
+				prev_imgbox = find_prev_imgbox((x1, y1, x2, y2), detections, images, image_name)
+				bbimgs.append(prev_imgbox)
+
+			bboxes.append( curbox )
 			bbtags.append( [x1,y1,x2,y2] )
 
 		# 3. fill in dictionaries
