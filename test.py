@@ -19,6 +19,17 @@ import mmcv
 
 from operator import itemgetter
 
+def extract_patch_block(patch):
+	# image.shape [h, w, c]
+	# split in 3 of height
+	# imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
+	h, w = patch.shape[0], patch.shape[1]
+	half_p = patch[:int(h/2), :, ]
+	s = int(0.3 * w)
+	roi = half_p[:, s:w-s, :]
+
+	return roi
+
 def debug_get_patch_by_id(track_num, detections, images):
 	# get hypothesis file
 	# extract all lines with field == track_num
@@ -46,32 +57,72 @@ def debug_get_patch_by_id(track_num, detections, images):
 	for (frame_num, i) in det_indices:
 		cv2.imwrite('./id_%d_f_%d.jpg' % (track_num, frame_num), images[str(frame_num)][i])
 
-	# hypothesis = np.loadtxt("./hypothesis.txt", delimiter=',')
-	# track_ids = hypothesis[:, 1].astype(np.int)
+	return
 
-	# for t in track_ids:
-	# 	print (t)
+def debug_print_link_cost(tracker, t1, t2, t3, fn, detections, images):
 
-	# mask = track_ids == track_num
-	# rows = hypothesis[mask]
+	# comparing link cost of t1 -> t3 & t2 - > t3
+	# t1 -> first track number in prev frame 
+	# t2 -> second track number in prev frame
+	# t3 -> track number in next frame
+	# fn -> prev frame number
 
-	# frame_infos = []
+	fi_t1 = []
+	fi_t2 = []
+	fi_t3 = []
 
-	# for r in rows:
-	# 	tid, x1, y1, w, h = int(r[1]), int(r[2]), int(r[3]), int(r[4]), int(r[5])
-	# 	frame_infos.append( ( int(r[0]), float(r[2]), float(r[3]) ) )
+	with open('./hypothesis.txt') as fp:
+		for line in fp:
+			line_lst = line.split(',')
 
-	# det_indices = []
+			if int(line_lst[1]) == t1:
+				fi_t1.append( ( int(line_lst[0]), float(line_lst[2]), float(line_lst[3]) ) )
 
-	# for (frame_num, x, y) in frame_infos:
-	# 	for i,d in enumerate(detections[str(frame_num)]):
-	# 		# curbox = [x1,y1,x2,y2,s]
+			if int(line_lst[1]) == t2:
+				fi_t2.append( ( int(line_lst[0]), float(line_lst[2]), float(line_lst[3]) ) )
 
-	# 		if d[0] == x and d[1] == y:
-	# 			det_indices.append((frame_num, i))
+			if int(line_lst[1]) == t3:
+				fi_t3.append( ( int(line_lst[0]), float(line_lst[2]), float(line_lst[3]) ) )
 
-	# for (frame_num, i) in det_indices:
-	# 	cv2.imwrite('id_%d_f_%d.jpg' % (track_num, frame_num), images[str(frame_num)][i])
+
+	det_indices = []
+	for (frame_num, x, y) in fi_t1:
+		if frame_num == fn:
+			for i,d in enumerate(detections[str(frame_num)]):
+				if d[0] == x and d[1] == y:
+					det_indices.append(i)
+					break
+	
+	for (frame_num, x, y) in fi_t2:
+		if frame_num == fn:
+			for i,d in enumerate(detections[str(frame_num)]):
+				if d[0] == x and d[1] == y:
+					det_indices.append(i)
+					break
+
+	for (frame_num, x, y) in fi_t3:
+		if frame_num == fn+1:
+			for i,d in enumerate(detections[str(frame_num)]):
+				if d[0] == x and d[1] == y:
+					det_indices.append(i)
+					break
+
+	prev_img_name = str(fn)
+	cur_img_name = str(fn+1)
+
+	diff_t1 = tracker._calc_cost_link(tracker._detections[prev_img_name][det_indices[2]], tracker._detections[cur_img_name][det_indices[0]],
+										images[prev_img_name][det_indices[2]], images[cur_img_name][det_indices[0]], False)
+
+	diff_t2 = tracker._calc_cost_link(tracker._detections[prev_img_name][det_indices[2]], tracker._detections[cur_img_name][det_indices[1]],
+										images[prev_img_name][det_indices[2]], images[cur_img_name][det_indices[1]], False)
+
+
+	print ('cost of transition of track %d -> track %d = %f' % (t1, t3, diff_t1))
+	print ('cost of transition of track %d -> track %d = %f' % (t2, t3, diff_t2))
+
+	cv2.imwrite('./id_%d_f_%d.jpg' % (t1, fn), images[str(fn)][det_indices[0]])
+	cv2.imwrite('./id_%d_f_%d.jpg' % (t2, fn), images[str(fn)][det_indices[1]])
+	cv2.imwrite('./id_%d_f_%d.jpg' % (t3, fn+1), images[str(fn+1)][det_indices[2]])
 
 	return
 
@@ -183,8 +234,8 @@ def find_prev_imgbox(box_cur, detections, images, name, frame):
 	prev_index = str(int(name)-1)
 
 	if prev_index not in detections:
-		print (prev_index)
-		print ('[bug] Unreliable box found in the first frame of the chunk')
+		# print (prev_index)
+		# print ('[bug] Unreliable box found in the first frame of the chunk')
 		# return frame[int(y1):int(y2), int(x1):int(x2), :]
 		return None, False
 		# sys.exit()
@@ -201,8 +252,8 @@ def find_prev_imgbox(box_cur, detections, images, name, frame):
 			max_iou_index = n
 
 	if max_iou_index == -1:
-		print (name, prev_index)
-		print ('[bug] No nearby box in previous frame was found!')
+		# print (name, prev_index)
+		# print ('[bug] No nearby box in previous frame was found!')
 		return None, False
 		# sys.exit()
 
@@ -250,6 +301,7 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 			is_reliable = True
 			curbox = [x1,y1,x2,y2,s]
 			imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
+			# imgbox = extract_patch_block(frame[int(y1):int(y2), int(x1):int(x2), :])
 
 			if not is_patch_reliable(curbox, rows):
 				# cv2.imwrite('unreliable_patch_%s_%d.jpg'%(image_name,n), frame[int(y1):int(y2), int(x1):int(x2), :])
@@ -259,8 +311,8 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 				bbimgs.append( imgbox )
 				bboxes.append( curbox )
 				bbtags.append( [x1,y1,x2,y2] )
-			else:
-				print ('outlier box detected')
+			# else:
+			# 	print ('outlier box detected')
 
 		# 3. fill in dictionaries
 		detections[image_name] = bboxes
@@ -275,7 +327,8 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 	min_thresh = 0
 	P_enter = 0.1
 	P_exit = 0.1
-	fib_search = False
+	# fib_search = False
+	fib_search = True
 
 	start = time.time()
 	tracker = MinCostFlowTracker(detections, tags, min_thresh, P_enter, P_exit)
@@ -318,11 +371,13 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 		if t_node[0] != sink_idx:
 			tr_end.append(n)
 
-	print ('tracks not finished at sink')
+	print ('# number of unique tracks %d' % (len(track_hypot)))
+
+	print ('-> tracks not finished at sink')
 	for index in tr_end:
 		print('track index %d finished at frame %s' % (index+1, track_hypot[index][-1]))
 
-	print ('tracks not started at source')
+	print ('-> tracks not started at source')
 	for index in tr_bgn:
 		print('track index %d started at frame %s' % (index+1, track_hypot[index][0]))
 
@@ -345,7 +400,8 @@ def main(path2video, path2det, frame_offset, frame_count, iid):
 						log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], 1))
 
 
-	debug_get_patch_by_id(13, detections, images)
+	# debug_get_patch_by_id(3, detections, images)
+	# debug_print_link_cost(tracker, 3, 13, 3, 865, detections, images)
 
 	return
 

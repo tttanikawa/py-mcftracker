@@ -14,7 +14,7 @@ def get_key(key):
 	except ValueError:
 		return key
 
-def calc_HS_histogram(image, roi):
+def calc_HS_histogram(image):
 	# cropped = image[roi[1]:roi[3], roi[0]:roi[2], :]
 	hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 	hist = cv2.calcHist([hsv], [0, 1], None, [180, 256], [0, 180, 0, 256])

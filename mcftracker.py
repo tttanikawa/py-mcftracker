@@ -53,27 +53,25 @@ class MinCostFlowTracker:
 	def _calc_cost_exit(self):
 		return -math.log(self.P_exit)
 
+	# def _calc_cost_detection(self, beta):
+	# 	return math.log(beta / (1.0 - beta))
+
 	def _calc_cost_detection(self, beta):
-		return math.log(beta / (1.0 - beta))
+		return math.log(beta)
 
-	def _calc_cost_link(self, rect1, rect2, cI, rI, imageList1=None, imageList2=None, dbgLog=False, eps=1e-9):
-		image1 = imageList1[cI]
-		image2 = imageList2[rI]
-
+	def _calc_cost_link(self, rect1, rect2, image1, image2, dbgLog=False, eps=1e-9):
 		prob_iou = tools.calc_overlap(rect1, rect2, dbgLog)
-		hist1 = tools.calc_HS_histogram(image1, rect1)
-		hist2 = tools.calc_HS_histogram(image2, rect2)
+		hist1 = tools.calc_HS_histogram(image1)
+		hist2 = tools.calc_HS_histogram(image2)
 		prob_color = 1.0 - tools.calc_bhattacharyya_distance(hist1, hist2)
 
-		# if dbgLog == True:
-		# 	print (prob_iou, prob_color)
-		if prob_color != 0. and prob_iou != 0.:
+		if prob_color > 0. and prob_iou > 0.:
 			prob_sim = prob_iou * prob_color
 			return -math.log(prob_sim + eps)
 		else:
 			return 10000
 
-	def build_network(self, images, first_img_name, last_img_name, f2i_factor=100):
+	def build_network(self, images, first_img_name, last_img_name, f2i_factor=200):
 		self.mcf = pywrapgraph.SimpleMinCostFlow()
 
 		for n, (image_name, rects) in enumerate(sorted(self._detections.items(), key=lambda t: tools.get_key(t[0]))):
@@ -84,10 +82,10 @@ class MinCostFlowTracker:
 			f2i_en = 10000
 			f2i_ex = 10000
 
-			if image_name == first_img_name:
-				f2i_en = 1
-			elif image_name == last_img_name:
-				f2i_ex = 1
+			# if image_name == first_img_name:
+			# 	f2i_en = 1
+			# elif image_name == last_img_name:
+			# 	f2i_ex = 1
 
 			for i, rect in enumerate(rects):
 				self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_en))
@@ -105,14 +103,12 @@ class MinCostFlowTracker:
 			
 			dbgLog = False
 			for i, i_rect in enumerate(self._detections[prev_image_name]):
-				# if image_name == "2" and i == 9:
-				# 	dbgLog = True
-					
 				if dbgLog == True:	
 					cv2.imwrite("./prev_crop.jpg", images[prev_image_name][i])
 
 				for j, j_rect in enumerate(rects):
-					unit_cost = int(self._calc_cost_link(i_rect, j_rect, i, j, images[prev_image_name], images[image_name], dbgLog) * 100)
+					# unit_cost = int(self._calc_cost_link(i_rect, j_rect, images[prev_image_name][i], images[image_name][j], dbgLog) * 1000)
+					unit_cost = int(self._calc_cost_link(i_rect, j_rect, images[prev_image_name][i], images[image_name][j], dbgLog) * 10)
 
 					if dbgLog == True:
 						cv2.imwrite("./cur_crop_%d.jpg" % (j), images[image_name][j])
@@ -190,7 +186,7 @@ class MinCostFlowTracker:
 		optimal_flow = -1
 		optimal_cost = float("inf")
 
-		for flow in range(40,55):
+		for flow in range(22,55):
 			self.mcf.SetNodeSupply(self._node2id["source"], flow)
 			self.mcf.SetNodeSupply(self._node2id["sink"], -flow)
 
@@ -201,9 +197,6 @@ class MinCostFlowTracker:
 				sys.exit()
 
 			print ("amount of flow at source: %d / optimal cost: %d" % (flow, cost))
-
-			if flow == 0:
-				continue
 
 			if cost < optimal_cost:
 				optimal_flow = flow
