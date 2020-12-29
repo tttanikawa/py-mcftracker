@@ -12,6 +12,8 @@ import sys
 import cv2
 import tools
 
+# for cosine difference
+from scipy.spatial import distance
 
 class MinCostFlowTracker:
 	"""
@@ -71,7 +73,17 @@ class MinCostFlowTracker:
 		else:
 			return 10000
 
-	def build_network(self, images, first_img_name, last_img_name, f2i_factor=200):
+	def _calc_cost_link_appearance(self, rect1, rect2, u, v, dbgLog=False, eps=1e-9):
+		prob_iou = tools.calc_overlap(rect1, rect2, dbgLog)
+		cos_dist = distance.cosine(u, v)
+
+		if cos_dist < 0.2500 and prob_iou > 0.:
+			# prob_sim = prob_iou * prob_color
+			return -math.log(prob_iou + eps)
+		else:
+			return 10000
+
+	def build_network(self, images, features, first_img_name, last_img_name, f2i_factor=200):
 		self.mcf = pywrapgraph.SimpleMinCostFlow()
 
 		for n, (image_name, rects) in enumerate(sorted(self._detections.items(), key=lambda t: tools.get_key(t[0]))):
@@ -107,8 +119,8 @@ class MinCostFlowTracker:
 					cv2.imwrite("./prev_crop.jpg", images[prev_image_name][i])
 
 				for j, j_rect in enumerate(rects):
-					# unit_cost = int(self._calc_cost_link(i_rect, j_rect, images[prev_image_name][i], images[image_name][j], dbgLog) * 1000)
-					unit_cost = int(self._calc_cost_link(i_rect, j_rect, images[prev_image_name][i], images[image_name][j], dbgLog) * 10)
+					# unit_cost = int(self._calc_cost_link(i_rect, j_rect, images[prev_image_name][i], images[image_name][j], dbgLog) * 10)
+					unit_cost = int(self._calc_cost_link_appearance(i_rect, j_rect, features[prev_image_name][i], features[image_name][j], dbgLog) * 10)
 
 					if dbgLog == True:
 						cv2.imwrite("./cur_crop_%d.jpg" % (j), images[image_name][j])

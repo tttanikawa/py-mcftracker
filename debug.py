@@ -4,7 +4,9 @@ from scipy.ndimage import rotate
 import numpy as np
 import mmcv
 
-def get_patch_by_id(tracker, track_num, detections, images):
+from scipy.spatial import distance
+
+def get_patch_by_id(tracker, track_num, detections, images, features):
 	# get hypothesis file
 	# extract all lines with field == track_num
 	frame_infos = []
@@ -35,16 +37,18 @@ def get_patch_by_id(tracker, track_num, detections, images):
 		# lc = tracker._calc_cost_link(detections[prev_img_name][prev_det_idx], detections[cur_img_name][cur_det_idx],
 		# 									images[prev_img_name][prev_det_idx], images[cur_img_name][cur_det_idx], False)
 
-		h1 = tools.calc_HS_histogram(images[prev_img_name][prev_det_idx])
-		h2 = tools.calc_HS_histogram(images[cur_img_name][cur_det_idx])
-		pc = 1.0 - tools.calc_bhattacharyya_distance(h1, h2)
+		# h1 = tools.calc_HS_histogram(images[prev_img_name][prev_det_idx])
+		# h2 = tools.calc_HS_histogram(images[cur_img_name][cur_det_idx])
+		# pc = 1.0 - tools.calc_bhattacharyya_distance(h1, h2)
+
+		cd = distance.cosine(features[prev_img_name][prev_det_idx], features[cur_img_name][cur_det_idx])
 
 		rot_img = rotate(images[cur_img_name][cur_det_idx], 90)
 		h = rot_img.shape[0]
 		w = rot_img.shape[1]
 
-		# cv2.putText(rot_img, str(lc), (1, int(h/2)+3), cv2.FONT_HERSHEY_PLAIN, 1, (0,0,255), 1)
-		cv2.putText(rot_img, str(pc), (1, int(h/2)+3), cv2.FONT_HERSHEY_PLAIN, 1, (0,0,255), 1)
+		cv2.putText(rot_img, str(cd), (1, int(h/2)+3), cv2.FONT_HERSHEY_PLAIN, 1, (0,0,255), 1)
+		# cv2.putText(rot_img, str(pc), (1, int(h/2)+3), cv2.FONT_HERSHEY_PLAIN, 1, (0,0,255), 1)
 		out_img = rotate(rot_img, -90)
 		cv2.imwrite('./id_%d_f_%s.jpg' % (track_num, cur_img_name), out_img)
 
