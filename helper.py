@@ -12,7 +12,6 @@ from torchreid.utils import FeatureExtractor
 from scripts.extract_fetures import network_feed_from_list
 
 from bepy.transform import Transform
-from bepy.models import MatchVideo
 from bepy.models import Video
 
 def is_patch_reliable(tlbr, boxes):
