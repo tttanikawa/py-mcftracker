@@ -5,11 +5,15 @@ import mmcv
 
 import sys
 sys.path.append('./player-feature-extractor')
+sys.path.append('/home/bepro/bepro-python')
 
 import torch
 from torchreid.utils import FeatureExtractor
 from scripts.extract_fetures import network_feed_from_list
 
+from bepy.transform import Transform
+from bepy.models import MatchVideo
+from bepy.models import Video
 
 def is_patch_reliable(tlbr, boxes):
     # calculate iou with all boxes in current frame
@@ -170,12 +174,19 @@ def calc_eucl_dist(det1, det2):
     dist = np.linalg.norm(pt1_np-pt2_np)
     return dist
 
-def compute_cost(cur_patch, ref_patch, cur_box, ref_box, alpha=0.5, inf=1e6):
+def compute_cost(cur_patch, ref_patch, cur_box, ref_box, transform, alpha=0.5, inf=1e6):
     hist1 = tools.calc_HS_histogram(cur_patch)
     hist2 = tools.calc_HS_histogram(ref_patch)
     
     color_diff = tools.calc_bhattacharyya_distance(hist1, hist2)
     distance = calc_eucl_dist(cur_box, ref_box)
+
+    # box: [2586.323, 896.2881, 2630.4094, 987.3661, 0.5701056]
+    # find box bottom-middle point
+    # normalize pixel coordinates
+    # X, Y, Z = transform.video_to_ground(0.49708763000922745, 0.43711630294638437)
+    # get physical distance
+    # normalise distance [0 - max distance threshold]
 
     if distance < 0 or distance > 180: 
         return inf
@@ -188,7 +199,7 @@ def compute_cost(cur_patch, ref_patch, cur_box, ref_box, alpha=0.5, inf=1e6):
 
     return cost
 
-def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, images, detections, inf=1e6, gap=500):
+def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, images, detections, transform, inf=1e6, gap=500):
     cost_mtx = np.zeros((len(hypothesis_t), len(hypothesis_s)))
 
     for i, index_i in enumerate(hypothesis_t):
@@ -197,7 +208,8 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, images, detections, inf=
             first_idx = hypothesis[index_j][0]
 
             cost_mtx[i][j] = compute_cost(images[last_idx[0]][last_idx[1]], images[first_idx[0]][first_idx[1]], 
-                                            detections[last_idx[0]][last_idx[1]], detections[first_idx[0]][first_idx[1]])
+                                            detections[last_idx[0]][last_idx[1]], detections[first_idx[0]][first_idx[1]],
+                                            transform)
 
             # check if start_i > end_i
             if int(last_idx[0]) > int(first_idx[0]):
@@ -208,8 +220,17 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, images, detections, inf=
 
     return cost_mtx
 
-def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, images, detections):
-    cost = cost_matrix(hypothesis, hypothesis_t, hypothesis_s, images, detections)
+def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, images, detections, match_video=None):
+    
+    video = Video.load(169051)
+
+    transform = Transform(
+        video.camera_recording["parameter"],
+        video.camera_recording["extrinsic_json"],
+        video.camera_recording["stitching_json"],
+    )
+
+    cost = cost_matrix(hypothesis, hypothesis_t, hypothesis_s, images, detections, transform)
     
     # assignment
     row_ind, col_ind = linear_sum_assignment(cost)
