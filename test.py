@@ -74,7 +74,8 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid):
         print('track index %d started at frame %s' %
               (index+1, track_hypot[index][0]))
 
-    helper.temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, images, detections)
+    # helper.temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, images, detections)
+    helper.temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, features, detections)
     
     helper.write_output_data(track_hypot, path2det, detections, slice_start, slice_end, frame_offset, iid)
     # debug.get_patch_by_id(tracker, 17, detections, images, features)

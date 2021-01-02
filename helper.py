@@ -16,6 +16,7 @@ from bepy.transform import Transform
 from bepy.models import MatchVideo
 
 import cv2
+from scipy.spatial import distance
 
 def box2midpoint_normalised(box, iw, ih):
     w = box[2]-box[0]
@@ -184,11 +185,8 @@ def calc_eucl_dist(det1, det2):
     dist = np.linalg.norm(pt1_np-pt2_np)
     return dist
 
-def compute_cost(cur_patch, ref_patch, cur_box, ref_box, transform, alpha=0.7, inf=1e6):
-    hist1 = tools.calc_HS_histogram(cur_patch)
-    hist2 = tools.calc_HS_histogram(ref_patch)
-    
-    color_diff = tools.calc_bhattacharyya_distance(hist1, hist2)
+def compute_cost(u, v, cur_box, ref_box, transform, alpha=0.5, maxdistance=8.5, inf=1e6):
+    cos_dist = distance.cosine(u, v)
 
     # test: project points (0,0,0), (1.0,0,0), (0,1.0,0), (1.0,1.0,0) to image
     frame = cv2.imread("frame.jpg")
@@ -200,9 +198,6 @@ def compute_cost(cur_patch, ref_patch, cur_box, ref_box, transform, alpha=0.7, i
     #     cv2.circle(frame, (int(x), int(y)), 5, (0,0,255), 5)
     #cv2.imwrite("frame.jpg", frame)
 
-    # box: [2586.323, 896.2881, 2630.4094, 987.3661, 0.5701056]
-    # find box bottom-middle point
-
     p1 = box2midpoint_normalised(cur_box, frame.shape[1], frame.shape[0])
     p2 = box2midpoint_normalised(ref_box, frame.shape[1], frame.shape[0])
 
@@ -211,20 +206,18 @@ def compute_cost(cur_patch, ref_patch, cur_box, ref_box, transform, alpha=0.7, i
 
     # print (transform.parameter.get("ground_width"), transform.parameter.get("ground_height"))
 
-    distance = calc_eucl_dist([cx*transform.parameter.get("ground_width"),cy*transform.parameter.get("ground_height")], 
+    dist = calc_eucl_dist([cx*transform.parameter.get("ground_width"),cy*transform.parameter.get("ground_height")], 
                         [rx*transform.parameter.get("ground_width"),ry*transform.parameter.get("ground_height")])
 
-    maxdistance = 7.
-
-    if distance < 0 or distance > maxdistance: 
+    if dist < 0 or dist > maxdistance: 
         return inf
 
-    dist_norm = distance / maxdistance
-    cost = alpha*dist_norm + (1-alpha)*color_diff
+    dist_norm = dist / maxdistance
+    cost = alpha*dist_norm + (1-alpha)*cos_dist
 
     return cost
 
-def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, images, detections, transform, inf=1e6, gap=500):
+def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform, inf=1e6, gap=500):
     cost_mtx = np.zeros((len(hypothesis_t), len(hypothesis_s)))
 
     for i, index_i in enumerate(hypothesis_t):
@@ -232,7 +225,7 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, images, detections, tran
             last_idx = hypothesis[index_i][-1] # tuple ('frame_num', detection_index, 'u')
             first_idx = hypothesis[index_j][0]
 
-            cost_mtx[i][j] = compute_cost(images[last_idx[0]][last_idx[1]], images[first_idx[0]][first_idx[1]], 
+            cost_mtx[i][j] = compute_cost(features[last_idx[0]][last_idx[1]], features[first_idx[0]][first_idx[1]], 
                                             detections[last_idx[0]][last_idx[1]], detections[first_idx[0]][first_idx[1]],
                                             transform)
 
@@ -245,7 +238,7 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, images, detections, tran
 
     return cost_mtx
 
-def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, images, detections, match_video_id=57824):
+def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, features, detections, match_video_id=57824):
     match_video = MatchVideo.load(match_video_id)
 
     transform = Transform(
@@ -254,7 +247,7 @@ def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, images, 
         match_video.video.camera_recording["stitching_json"],
     )
 
-    cost = cost_matrix(hypothesis, hypothesis_t, hypothesis_s, images, detections, transform)
+    cost = cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform)
     
     # assignment
     row_ind, col_ind = linear_sum_assignment(cost)
