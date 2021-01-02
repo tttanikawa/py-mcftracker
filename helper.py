@@ -12,7 +12,7 @@ from torchreid.utils import FeatureExtractor
 from scripts.extract_fetures import network_feed_from_list
 
 from bepy.transform import Transform
-from bepy.models import Video
+# from bepy.models import Video
 from bepy.models import MatchVideo
 
 import cv2
@@ -184,12 +184,11 @@ def calc_eucl_dist(det1, det2):
     dist = np.linalg.norm(pt1_np-pt2_np)
     return dist
 
-def compute_cost(cur_patch, ref_patch, cur_box, ref_box, transform, alpha=0.5, inf=1e6):
+def compute_cost(cur_patch, ref_patch, cur_box, ref_box, transform, alpha=0.7, inf=1e6):
     hist1 = tools.calc_HS_histogram(cur_patch)
     hist2 = tools.calc_HS_histogram(ref_patch)
     
     color_diff = tools.calc_bhattacharyya_distance(hist1, hist2)
-    distance = calc_eucl_dist(cur_box, ref_box)
 
     # test: project points (0,0,0), (1.0,0,0), (0,1.0,0), (1.0,1.0,0) to image
     frame = cv2.imread("frame.jpg")
@@ -199,6 +198,7 @@ def compute_cost(cur_patch, ref_patch, cur_box, ref_box, transform, alpha=0.5, i
     #     x = x * frame.shape[1]
     #     y = y * frame.shape[0]
     #     cv2.circle(frame, (int(x), int(y)), 5, (0,0,255), 5)
+    #cv2.imwrite("frame.jpg", frame)
 
     # box: [2586.323, 896.2881, 2630.4094, 987.3661, 0.5701056]
     # find box bottom-middle point
@@ -211,19 +211,15 @@ def compute_cost(cur_patch, ref_patch, cur_box, ref_box, transform, alpha=0.5, i
 
     # print (transform.parameter.get("ground_width"), transform.parameter.get("ground_height"))
 
-    d = calc_eucl_dist([cx*transform.parameter.get("ground_width"),cy*transform.parameter.get("ground_height")], 
+    distance = calc_eucl_dist([cx*transform.parameter.get("ground_width"),cy*transform.parameter.get("ground_height")], 
                         [rx*transform.parameter.get("ground_width"),ry*transform.parameter.get("ground_height")])
 
-    # get physical distance
-    # normalise distance [0 - max distance threshold]
+    maxdistance = 7.
 
-    if distance < 0 or distance > 180: 
+    if distance < 0 or distance > maxdistance: 
         return inf
 
-    # cost = a*distance + b*color_diff	
-    # colour diff is normalised (0, 1.0) !
-    dist_norm = float(distance) / float(180)
-    # cost = alpha*distance + (1-alpha)*color_diff
+    dist_norm = distance / maxdistance
     cost = alpha*dist_norm + (1-alpha)*color_diff
 
     return cost
@@ -249,15 +245,13 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, images, detections, tran
 
     return cost_mtx
 
-def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, images, detections, match_video=None):
-    
-    video = Video.load(169052)
-    # video = MatchVideo.load(57824)
+def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, images, detections, match_video_id=57824):
+    match_video = MatchVideo.load(match_video_id)
 
     transform = Transform(
-        video.camera_recording["parameter"],
-        video.camera_recording["extrinsic_json"],
-        video.camera_recording["stitching_json"],
+        match_video.video.camera_recording["parameter"],
+        match_video.video.camera_recording["extrinsic_json"],
+        match_video.video.camera_recording["stitching_json"],
     )
 
     cost = cost_matrix(hypothesis, hypothesis_t, hypothesis_s, images, detections, transform)
