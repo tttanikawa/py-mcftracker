@@ -13,6 +13,14 @@ from scripts.extract_fetures import network_feed_from_list
 
 from bepy.transform import Transform
 from bepy.models import Video
+from bepy.models import MatchVideo
+
+import cv2
+
+def box2midpoint_normalised(box, iw, ih):
+    w = box[2]-box[0]
+    x, y = box[0] + w/2, box[3]
+    return (x/iw, y/ih)
 
 def is_patch_reliable(tlbr, boxes):
     # calculate iou with all boxes in current frame
@@ -75,6 +83,9 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
     for index in range(slice_start, slice_end):
         frame = video[index]
+
+        if index == slice_start:
+            cv2.imwrite("./frame.jpg", frame)
 
         if (index+1) % 500 == 0:
             print ('-> reading frame %d / %d' % (index+1, slice_end))
@@ -180,10 +191,29 @@ def compute_cost(cur_patch, ref_patch, cur_box, ref_box, transform, alpha=0.5, i
     color_diff = tools.calc_bhattacharyya_distance(hist1, hist2)
     distance = calc_eucl_dist(cur_box, ref_box)
 
+    # test: project points (0,0,0), (1.0,0,0), (0,1.0,0), (1.0,1.0,0) to image
+    frame = cv2.imread("frame.jpg")
+    # ground_points = [[0.,0.,0.], [1.,0.,0.], [0.,1.,0.], [1.,1.,0.]]
+    # for point in ground_points:        
+    #     x, y = transform.ground_to_video(point[0], point[1])
+    #     x = x * frame.shape[1]
+    #     y = y * frame.shape[0]
+    #     cv2.circle(frame, (int(x), int(y)), 5, (0,0,255), 5)
+
     # box: [2586.323, 896.2881, 2630.4094, 987.3661, 0.5701056]
     # find box bottom-middle point
-    # normalize pixel coordinates
-    # X, Y, Z = transform.video_to_ground(0.49708763000922745, 0.43711630294638437)
+
+    p1 = box2midpoint_normalised(cur_box, frame.shape[1], frame.shape[0])
+    p2 = box2midpoint_normalised(ref_box, frame.shape[1], frame.shape[0])
+
+    cx, cy = transform.video_to_ground(p1[0], p1[1])
+    rx, ry = transform.video_to_ground(p2[0], p2[1])
+
+    # print (transform.parameter.get("ground_width"), transform.parameter.get("ground_height"))
+
+    d = calc_eucl_dist([cx*transform.parameter.get("ground_width"),cy*transform.parameter.get("ground_height")], 
+                        [rx*transform.parameter.get("ground_width"),ry*transform.parameter.get("ground_height")])
+
     # get physical distance
     # normalise distance [0 - max distance threshold]
 
@@ -221,7 +251,8 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, images, detections, tran
 
 def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, images, detections, match_video=None):
     
-    video = Video.load(169051)
+    video = Video.load(169052)
+    # video = MatchVideo.load(57824)
 
     transform = Transform(
         video.camera_recording["parameter"],
