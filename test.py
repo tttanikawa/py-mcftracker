@@ -10,7 +10,7 @@ import helper
 import debug
 
 
-def run_mfct(path2video, path2det, frame_offset, frame_count, iid):
+def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_id):
     print ('# starting to read input frames & detection data')
 
     det_in = np.loadtxt(path2det, delimiter=',')
@@ -75,7 +75,7 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid):
               (index+1, track_hypot[index][0]))
 
     # helper.temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, images, detections)
-    helper.temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, features, detections)
+    helper.temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, features, detections, match_video_id)
     
     helper.write_output_data(track_hypot, path2det, detections, slice_start, slice_end, frame_offset, iid)
     # debug.get_patch_by_id(tracker, 17, detections, images, features)
@@ -96,8 +96,11 @@ if __name__ == "__main__":
     iid = int(sys.argv[5])
     print ('# argv 5 -> instance id: %d' % (iid))
 
+    mvi = int(sys.argv[6])
+    print ('# argv 6 -> match_video_id: %d' % (mvi))
+
     visualise = True
-    run_mfct(path2video, path2det, frame_offset, frame_count, iid)
+    run_mfct(path2video, path2det, frame_offset, frame_count, iid, mvi)
 
     if visualise == True:
         debug.visualise_hypothesis(
