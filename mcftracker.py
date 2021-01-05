@@ -81,9 +81,10 @@ class MinCostFlowTracker:
 		# 	# prob_sim = prob_iou * prob_color
 		# 	return -math.log(prob_iou + eps)
 
-		if cos_dist < 0.300 and prob_iou > 0.:
+		if cos_dist < 0.2500 and prob_iou > 0.:
 			prob_color = 1.0 - cos_dist
-			prob_sim = prob_color * prob_iou
+			# prob_sim = prob_color * prob_iou
+			prob_sim = prob_color
 			return -math.log(prob_sim + eps)
 		else:
 			return 10000
