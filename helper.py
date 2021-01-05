@@ -40,11 +40,9 @@ def find_prev_imgbox(box_cur, detections, images, name, frame):
     prev_index = str(int(name)-1)
 
     if prev_index not in detections:
-        # print (prev_index)
         # print ('[bug] Unreliable box found in the first frame of the chunk')
-        # return frame[int(y1):int(y2), int(x1):int(x2), :]
+        # print (name, box_cur)
         return None, False
-        # sys.exit()
  
     max_iou_index = -1
     max_iou = 0.
@@ -58,10 +56,8 @@ def find_prev_imgbox(box_cur, detections, images, name, frame):
             max_iou_index = n
 
     if max_iou_index == -1:
-        # print (name, prev_index)
         # print ('[bug] No nearby box in previous frame was found!')
         return None, False
-        # sys.exit()
 
     return images[prev_index][max_iou_index], True
 
@@ -110,7 +106,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             curbox = [x1,y1,x2,y2,s]
             imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
 
-            if not is_patch_reliable(curbox, rows):
+            if not is_patch_reliable(curbox, rows) and index != slice_start:
                 imgbox, is_reliable = find_prev_imgbox(curbox[:4], detections, images, image_name, frame)
 
             if is_reliable:	
