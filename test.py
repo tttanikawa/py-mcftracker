@@ -32,6 +32,7 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     tracker.build_network(images, features, str(first_img_name), str(slice_end))
 
     print ('-> finish building min cost flow graph')
+    # optimal_flow, optimal_cost = tracker.run(fib=False)
     optimal_flow, optimal_cost = tracker.run(fib=True)
     end = time.time()
 
@@ -44,7 +45,8 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
 
     track_hypot = []
 
-    source_idx = str(slice_start+1) if slice_start == 0 else str(slice_start)
+    # source_idx = str(slice_start+1) if slice_start == 0 else str(slice_start)
+    source_idx = str(slice_start+1)
     sink_idx = str(slice_end)
 
     print ('-> offset interval [%s-%s]' % (source_idx, sink_idx))

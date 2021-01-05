@@ -73,13 +73,18 @@ class MinCostFlowTracker:
 		else:
 			return 10000
 
-	def _calc_cost_link_appearance(self, rect1, rect2, u, v, dbgLog=False, eps=1e-9):
+	def _calc_cost_link_appearance(self, rect1, rect2, u, v, dbgLog=False, eps=1e-9, c=0.7):
 		prob_iou = tools.calc_overlap(rect1, rect2, dbgLog)
 		cos_dist = distance.cosine(u, v)
 
-		if cos_dist < 0.2500 and prob_iou > 0.:
-			# prob_sim = prob_iou * prob_color
-			return -math.log(prob_iou + eps)
+		# if cos_dist < 0.2500 and prob_iou > 0.:
+		# 	# prob_sim = prob_iou * prob_color
+		# 	return -math.log(prob_iou + eps)
+
+		if cos_dist < 0.300 and prob_iou > 0.:
+			prob_color = 1.0 - cos_dist
+			prob_sim = prob_color * prob_iou
+			return -math.log(prob_sim + eps)
 		else:
 			return 10000
 
@@ -198,7 +203,7 @@ class MinCostFlowTracker:
 		optimal_flow = -1
 		optimal_cost = float("inf")
 
-		for flow in range(22,55):
+		for flow in range(50,80):
 			self.mcf.SetNodeSupply(self._node2id["source"], flow)
 			self.mcf.SetNodeSupply(self._node2id["sink"], -flow)
 
