@@ -184,7 +184,7 @@ def calc_eucl_dist(det1, det2):
     dist = np.linalg.norm(pt1_np-pt2_np)
     return dist
 
-def compute_cost(u, v, cur_box, ref_box, transform, alpha=0.7, maxdistance=8.5, inf=1e6):
+def compute_cost(u, v, cur_box, ref_box, transform, alpha=0.7, maxdistance=6.5, inf=1e6):
     cos_dist = distance.cosine(u, v)
 
     # test: project points (0,0,0), (1.0,0,0), (0,1.0,0), (1.0,1.0,0) to image
@@ -211,9 +211,8 @@ def compute_cost(u, v, cur_box, ref_box, transform, alpha=0.7, maxdistance=8.5, 
     if dist < 0 or dist > maxdistance: 
         return inf
 
-    cost = dist if cos_dist < 0.280 else inf
-    # dist_norm = dist / maxdistance
-    # cost = alpha*dist_norm + (1-alpha)*cos_dist
+    dist_norm = dist / maxdistance
+    cost = alpha*dist_norm + (1-alpha)*cos_dist
 
     return cost
 
