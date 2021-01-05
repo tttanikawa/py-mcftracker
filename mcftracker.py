@@ -98,16 +98,8 @@ class MinCostFlowTracker:
 			if n % 100 == 0:
 				print ('-> processing image %s / %s' % (image_name, last_img_name))
 
-			# f2i_en = 10000
-			# f2i_ex = 10000
-
-			f2i_en = 1000
-			f2i_ex = 1000
-
-			# if image_name == first_img_name:
-			# 	f2i_en = 1
-			# elif image_name == last_img_name:
-			# 	f2i_ex = 1
+			f2i_en = 20000
+			f2i_ex = 20000
 
 			for i, rect in enumerate(rects):
 				self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_en))
