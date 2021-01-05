@@ -81,7 +81,8 @@ class MinCostFlowTracker:
 		# 	# prob_sim = prob_iou * prob_color
 		# 	return -math.log(prob_iou + eps)
 
-		if cos_dist < 0.2500 and prob_iou > 0.:
+		# if cos_dist < 0.2500 and prob_iou > 0.:
+		if cos_dist < 0.2800 and prob_iou > 0.:
 			prob_color = 1.0 - cos_dist
 			# prob_sim = prob_color * prob_iou
 			prob_sim = prob_color
@@ -97,8 +98,11 @@ class MinCostFlowTracker:
 			if n % 100 == 0:
 				print ('-> processing image %s / %s' % (image_name, last_img_name))
 
-			f2i_en = 10000
-			f2i_ex = 10000
+			# f2i_en = 10000
+			# f2i_ex = 10000
+
+			f2i_en = 1000
+			f2i_ex = 1000
 
 			# if image_name == first_img_name:
 			# 	f2i_en = 1
