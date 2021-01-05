@@ -180,7 +180,7 @@ def calc_eucl_dist(det1, det2):
     dist = np.linalg.norm(pt1_np-pt2_np)
     return dist
 
-def compute_cost(u, v, cur_box, ref_box, transform, alpha=0.7, maxdistance=6.0, inf=1e6):
+def compute_cost(u, v, cur_box, ref_box, transform, alpha=0.7, maxdistance=8.5, inf=1e6):
     cos_dist = distance.cosine(u, v)
 
     # test: project points (0,0,0), (1.0,0,0), (0,1.0,0), (1.0,1.0,0) to image
