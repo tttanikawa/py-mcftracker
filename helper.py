@@ -113,6 +113,10 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
                 bbimgs.append( imgbox )
                 bboxes.append( curbox )
                 bbtags.append( [x1,y1,x2,y2] )
+        
+        if len(bbimgs) == 0:
+            print ('No valid bounding boxes for frame %s' % (image_name))
+            sys.exit()
 
         # 3. fill in dictionaries
         detections[image_name] = bboxes
