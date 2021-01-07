@@ -21,15 +21,15 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     slice_start = 0 if frame_offset == 0 else frame_offset-1
     slice_end = min(frame_offset+frame_count, frame_offset+max_frame_idx)
 
-    detections, tags, images, features = helper.read_input_data(
-        path2det, path2video, slice_start, slice_end, det_in, frame_indices)
+    detections, tags, images, features, transform, size = helper.read_input_data(
+        path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id)
 
     start = time.time()
     tracker = MinCostFlowTracker(detections, tags, 0, 0.1, 0.1)
 
     print ('-> start building min cost flow graph')
     first_img_name = 1 if slice_start == 0 else slice_start
-    tracker.build_network(images, features, str(first_img_name), str(slice_end))
+    tracker.build_network(images, features, str(first_img_name), str(slice_end), transform, size)
 
     print ('-> finish building min cost flow graph')
     # optimal_flow, optimal_cost = tracker.run(fib=False)
@@ -76,11 +76,11 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
         print('track index %d started at frame %s' %
               (index+1, track_hypot[index][0]))
 
-    # helper.temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, images, detections)
-    helper.temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, features, detections, match_video_id)
-    
+    helper.temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, features, detections, transform, size, match_video_id)
     helper.write_output_data(track_hypot, path2det, detections, slice_start, slice_end, frame_offset, iid)
-    # debug.get_patch_by_id(tracker, 17, detections, images, features)
+
+    # debug.get_patch_by_id(tracker, 13, detections, images, features)
+    # debug.validate_cosine_with_detections(path2video, [48,49,50,51], detections, features)
 
 if __name__ == "__main__":
     path2video = sys.argv[1]

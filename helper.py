@@ -4,8 +4,11 @@ import numpy as np
 import mmcv
 
 import sys
-sys.path.append('/root/py-mcftracker/player-feature-extractor')
-sys.path.append('/root/bepro-python')
+# sys.path.append('/root/py-mcftracker/player-feature-extractor')
+# sys.path.append('/root/bepro-python')
+
+sys.path.append('./player-feature-extractor')
+sys.path.append('/home/bepro/bepro-python')
 
 import torch
 from torchreid.utils import FeatureExtractor
@@ -16,6 +19,8 @@ from bepy.models import MatchVideo
 
 import cv2
 from scipy.spatial import distance
+
+import debug
 
 def box2midpoint_normalised(box, iw, ih):
     w = box[2]-box[0]
@@ -61,8 +66,10 @@ def find_prev_imgbox(box_cur, detections, images, name, frame):
 
     return images[prev_index][max_iou_index], True
 
-def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices,
-                        ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
+                        # ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        ckpt_path='/home/bepro/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+    
     detections = {}
     tags = {}
     images = {}
@@ -77,10 +84,21 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
         device='cuda'
     )
 
+    match_video = MatchVideo.load(match_video_id)
+
+    transform = Transform(
+        match_video.video.camera_recording["parameter"],
+        match_video.video.camera_recording["extrinsic_json"],
+        match_video.video.camera_recording["stitching_json"],
+    )
+
+    size = np.zeros(2)
+
     for index in range(slice_start, slice_end):
         frame = video[index]
 
         if index == slice_start:
+            size = frame.shape
             cv2.imwrite("./frame.jpg", frame)
 
         if (index+1) % 500 == 0:
@@ -113,7 +131,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
                 bbimgs.append( imgbox )
                 bboxes.append( curbox )
                 bbtags.append( [x1,y1,x2,y2] )
-        
+
         if len(bbimgs) == 0:
             print ('No valid bounding boxes for frame %s' % (image_name))
             break
@@ -126,7 +144,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
     print ('-> %d images have been read & processed' % (len(detections)))
 
-    return detections, tags, images, features
+    return detections, tags, images, features, transform, size
 
 def write_output_data(track_hypot, path2det, detections, slice_start, slice_end, frame_offset, iid):
     # write to file
@@ -184,11 +202,11 @@ def calc_eucl_dist(det1, det2):
     dist = np.linalg.norm(pt1_np-pt2_np)
     return dist
 
-def compute_cost(u, v, cur_box, ref_box, transform, alpha=0.7, maxdistance=6.5, inf=1e6):
+def compute_cost(u, v, cur_box, ref_box, transform, size, alpha=0.5, maxdistance=4.0, inf=1e6):
     cos_dist = distance.cosine(u, v)
 
     # test: project points (0,0,0), (1.0,0,0), (0,1.0,0), (1.0,1.0,0) to image
-    frame = cv2.imread("frame.jpg")
+    # frame = cv2.imread("frame.jpg")
     # ground_points = [[0.,0.,0.], [1.,0.,0.], [0.,1.,0.], [1.,1.,0.]]
     # for point in ground_points:        
     #     x, y = transform.ground_to_video(point[0], point[1])
@@ -197,8 +215,8 @@ def compute_cost(u, v, cur_box, ref_box, transform, alpha=0.7, maxdistance=6.5, 
     #     cv2.circle(frame, (int(x), int(y)), 5, (0,0,255), 5)
     #cv2.imwrite("frame.jpg", frame)
 
-    p1 = box2midpoint_normalised(cur_box, frame.shape[1], frame.shape[0])
-    p2 = box2midpoint_normalised(ref_box, frame.shape[1], frame.shape[0])
+    p1 = box2midpoint_normalised(cur_box, size[1], size[0])
+    p2 = box2midpoint_normalised(ref_box, size[1], size[0])
 
     cx, cy = transform.video_to_ground(p1[0], p1[1])
     rx, ry = transform.video_to_ground(p2[0], p2[1])
@@ -216,7 +234,7 @@ def compute_cost(u, v, cur_box, ref_box, transform, alpha=0.7, maxdistance=6.5, 
 
     return cost
 
-def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform, inf=1e6, gap=250):
+def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform, size, inf=1e6, gap=100):
     cost_mtx = np.zeros((len(hypothesis_t), len(hypothesis_s)))
 
     for i, index_i in enumerate(hypothesis_t):
@@ -226,7 +244,7 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, tr
 
             cost_mtx[i][j] = compute_cost(features[last_idx[0]][last_idx[1]], features[first_idx[0]][first_idx[1]], 
                                             detections[last_idx[0]][last_idx[1]], detections[first_idx[0]][first_idx[1]],
-                                            transform)
+                                            transform, size)
 
             # check if start_i > end_i
             if int(last_idx[0]) > int(first_idx[0]):
@@ -237,16 +255,8 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, tr
 
     return cost_mtx
 
-def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, features, detections, match_video_id=57824):
-    match_video = MatchVideo.load(match_video_id)
-
-    transform = Transform(
-        match_video.video.camera_recording["parameter"],
-        match_video.video.camera_recording["extrinsic_json"],
-        match_video.video.camera_recording["stitching_json"],
-    )
-
-    cost = cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform)
+def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform, size, match_video_id=57824):
+    cost = cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform, size)
     
     # assignment
     row_ind, col_ind = linear_sum_assignment(cost)
