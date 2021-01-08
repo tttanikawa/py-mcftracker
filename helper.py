@@ -116,9 +116,9 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
         for n,r in enumerate(rows):
             _, x1, y1, x2, y2, s = int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])
 
-            # filtering scores less than .51, allowing vals less than .51 causes bug in graph
-            if s < 0.51:
-                continue
+            # # filtering scores less than .51, allowing vals less than .51 causes bug in graph
+            # if s < 0.51:
+            #     continue
             
             is_reliable = True
             curbox = [x1,y1,x2,y2,s]
@@ -202,7 +202,7 @@ def calc_eucl_dist(det1, det2):
     dist = np.linalg.norm(pt1_np-pt2_np)
     return dist
 
-def compute_cost(u, v, cur_box, ref_box, transform, size, alpha=0.5, maxdistance=4.0, inf=1e6):
+def compute_cost(u, v, cur_box, ref_box, transform, size, alpha=0.7, maxdistance=4.0, inf=1e6):
     cos_dist = distance.cosine(u, v)
 
     # test: project points (0,0,0), (1.0,0,0), (0,1.0,0), (1.0,1.0,0) to image
@@ -234,7 +234,7 @@ def compute_cost(u, v, cur_box, ref_box, transform, size, alpha=0.5, maxdistance
 
     return cost
 
-def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform, size, inf=1e6, gap=100):
+def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform, size, inf=1e6, gap=150):
     cost_mtx = np.zeros((len(hypothesis_t), len(hypothesis_s)))
 
     for i, index_i in enumerate(hypothesis_t):

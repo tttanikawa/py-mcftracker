@@ -25,7 +25,7 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
         path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id)
 
     start = time.time()
-    tracker = MinCostFlowTracker(detections, tags, 0, 0.1, 0.1)
+    tracker = MinCostFlowTracker(detections, tags, 0, 0.3, 0.1)
 
     print ('-> start building min cost flow graph')
     first_img_name = 1 if slice_start == 0 else slice_start
@@ -79,8 +79,8 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     helper.temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, features, detections, transform, size, match_video_id)
     helper.write_output_data(track_hypot, path2det, detections, slice_start, slice_end, frame_offset, iid)
 
-    # debug.get_patch_by_id(tracker, 13, detections, images, features)
-    # debug.validate_cosine_with_detections(path2video, [48,49,50,51], detections, features)
+    debug.get_patch_by_id(tracker, 4, detections, images, features)
+    debug.validate_cosine_with_detections(path2video, [2430,2433,2451,2515], detections, features)
 
 if __name__ == "__main__":
     path2video = sys.argv[1]

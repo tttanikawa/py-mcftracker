@@ -56,11 +56,8 @@ class MinCostFlowTracker:
     def _calc_cost_exit(self):
         return -math.log(self.P_exit)
 
-    # def _calc_cost_detection(self, beta):
-    # 	return math.log(beta / (1.0 - beta))
-
     def _calc_cost_detection(self, beta):
-        return math.log(beta)
+    	return math.log(beta / (1.0 - beta))
 
     def _calc_cost_link(self, rect1, rect2, image1, image2, dbgLog=False, eps=1e-9):
         prob_iou = tools.calc_overlap(rect1, rect2, dbgLog)
@@ -74,10 +71,10 @@ class MinCostFlowTracker:
         else:
             return 10000
 
-    def _calc_cost_link_appearance(self, rect1, rect2, u, v, transform, size, dbgLog=False, eps=1e-7, c=0.5, maxdist=1.0):
+    def _calc_cost_link_appearance(self, rect1, rect2, u, v, transform, size, dbgLog=False, eps=1e-7, c=0.5, maxdist=2.0):
         cos_dist = distance.cosine(u, v)
         
-        if cos_dist > 0.2600:
+        if cos_dist > 0.210:
             return 10000
 
         p1 = helper.box2midpoint_normalised(rect1, size[1], size[0])

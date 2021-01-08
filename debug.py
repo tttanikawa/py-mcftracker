@@ -35,21 +35,17 @@ def get_patch_by_id(tracker, track_num, detections, images, features):
         cur_img_name = str(cur_det_data[0])
         cur_det_idx = cur_det_data[1]
 
-        # lc = tracker._calc_cost_link(detections[prev_img_name][prev_det_idx], detections[cur_img_name][cur_det_idx],
-        # 									images[prev_img_name][prev_det_idx], images[cur_img_name][cur_det_idx], False)
-
-        # h1 = tools.calc_HS_histogram(images[prev_img_name][prev_det_idx])
-        # h2 = tools.calc_HS_histogram(images[cur_img_name][cur_det_idx])
-        # pc = 1.0 - tools.calc_bhattacharyya_distance(h1, h2)
-
         cd = distance.cosine(features[prev_img_name][prev_det_idx], features[cur_img_name][cur_det_idx])
+
+        if cur_img_name == "2515":
+            cv2.imwrite ('./%s_orig_patch_cur.jpg' % (cur_img_name), images[cur_img_name][cur_det_idx])
+            cv2.imwrite ('./%s_orig_patch_prev.jpg' % (prev_img_name), images[prev_img_name][prev_det_idx])
 
         rot_img = rotate(images[cur_img_name][cur_det_idx], 90)
         h = rot_img.shape[0]
         w = rot_img.shape[1]
 
         cv2.putText(rot_img, str(round(cd, 6)), (1, int(h/2)+3), cv2.FONT_HERSHEY_PLAIN, 1, (0,0,255), 1)
-        # cv2.putText(rot_img, str(pc), (1, int(h/2)+3), cv2.FONT_HERSHEY_PLAIN, 1, (0,0,255), 1)
         out_img = rotate(rot_img, -90)
         cv2.imwrite('./id_%d_f_%s.jpg' % (track_num, cur_img_name), out_img)
 
@@ -65,7 +61,7 @@ def visualise_hypothesis(path2video, path2det, frame_offset, frame_count):
     min_frame_idx = frame_indices.astype(np.int).min()
     max_frame_idx = frame_indices.astype(np.int).max()
     
-    out_size = (1800, 600)
+    out_size = (1800, 550)
     vout = cv2.VideoWriter('./out.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 25, out_size)
 
     video = mmcv.VideoReader(path2video)
