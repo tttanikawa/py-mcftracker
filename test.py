@@ -32,7 +32,6 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     tracker.build_network(images, features, str(first_img_name), str(slice_end), transform, size)
 
     print ('-> finish building min cost flow graph')
-    # optimal_flow, optimal_cost = tracker.run(fib=False)
     optimal_flow, optimal_cost = tracker.run(fib=True)
     end = time.time()
 
@@ -40,47 +39,19 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     print("Optimal number of flow: {}".format(optimal_flow))
     print("Optimal cost: {}".format(optimal_cost))
 
-    tr_end = []
-    tr_bgn = []
-
-    track_hypot = []
-
-    # source_idx = str(slice_start+1) if slice_start == 0 else str(slice_start)
     source_idx = str(slice_start+1)
     sink_idx = str(slice_end)
 
     print ('-> offset interval [%s-%s]' % (source_idx, sink_idx))
-
-    for n, (k, _) in enumerate(tracker.flow_dict["source"].items()):
-        tr_lst = helper.loop_get_track(k, tracker.flow_dict)
-        track_hypot.append(tr_lst)
-
-        s_node = tr_lst[0]
-        t_node = tr_lst[-1]
-
-        if s_node[0] != source_idx:
-            tr_bgn.append(n)
-
-        if t_node[0] != sink_idx:
-            tr_end.append(n)
-
-    print ('# number of unique tracks %d' % (len(track_hypot)))
-
-    print ('-> tracks not finished at sink')
-    for index in tr_end:
-        print('track index %d finished at frame %s' %
-              (index+1, track_hypot[index][-1]))
-
-    print ('-> tracks not started at source')
-    for index in tr_bgn:
-        print('track index %d started at frame %s' %
-              (index+1, track_hypot[index][0]))
+    track_hypot, tr_bgn, tr_end = helper.build_hypothesis_lst(tracker.flow_dict, source_idx, sink_idx)
 
     helper.temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, features, detections, transform, size, match_video_id)
     helper.write_output_data(track_hypot, path2det, detections, slice_start, slice_end, frame_offset, iid)
 
-    debug.get_patch_by_id(tracker, 4, detections, images, features)
-    debug.validate_cosine_with_detections(path2video, [2430,2433,2451,2515], detections, features)
+    debug.visualise_hypothesis_with_detections(path2video, detections, slice_start, slice_end)
+    # debug.visualise_hypothesis(path2video, path2det, frame_offset, frame_count)
+    # debug.get_patch_by_id(tracker, 24, detections, images, features)
+    # debug.validate_cosine_with_detections(path2video, [2512,2513,2514,2515], detections, features, images)
 
 if __name__ == "__main__":
     path2video = sys.argv[1]
@@ -101,9 +72,4 @@ if __name__ == "__main__":
     mvi = int(sys.argv[6])
     print ('# argv 6 -> match_video_id: %d' % (mvi))
 
-    visualise = True
     run_mfct(path2video, path2det, frame_offset, frame_count, iid, mvi)
-
-    if visualise == True:
-        debug.visualise_hypothesis(
-            path2video, path2det, frame_offset, frame_count)

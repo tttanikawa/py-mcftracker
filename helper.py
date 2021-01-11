@@ -21,6 +21,12 @@ import cv2
 from scipy.spatial import distance
 
 import debug
+import copy
+
+import matplotlib.pyplot as plt
+from scipy.misc import face
+
+import math
 
 def box2midpoint_normalised(box, iw, ih):
     w = box[2]-box[0]
@@ -36,35 +42,22 @@ def is_patch_reliable(tlbr, boxes):
         if cb == tlbr:
             continue
 
-        if tools.calc_overlap(tlbr[:4], cb[:4]) > 0.1:
+        if tools.calc_overlap(tlbr[:4], cb[:4]) > 1.0:
+        # if tools.calc_overlap(tlbr[:4], cb[:4]) > 0.1:
             return False
 
     return True
     
-def find_prev_imgbox(box_cur, detections, images, name, frame):
+def find_prev_imgbox(transform, box_cur, detections, images, name, frame, bi):
     prev_index = str(int(name)-1)
+    # max_iou_index = debug.return_closest_box_index(box_cur, detections[prev_index], frame, bi)
+    min_dist_index = debug.return_closest_box_index_extrinsic(transform, box_cur, detections[prev_index], frame, bi)
 
-    if prev_index not in detections:
-        # print ('[bug] Unreliable box found in the first frame of the chunk')
-        # print (name, box_cur)
-        return None, False
- 
-    max_iou_index = -1
-    max_iou = 0.
+    if min_dist_index == -1:
+        return False, None
 
-    for n, box in enumerate(detections[prev_index]):
-        # x1, y1, x2, y2, s = float(box[0]), float(box[1]), float(box[2]), float(box[3]), float(box[4])
-        iou = tools.calc_overlap(box_cur, box[:4])
-        
-        if iou > max_iou:
-            max_iou = iou
-            max_iou_index = n
-
-    if max_iou_index == -1:
-        # print ('[bug] No nearby box in previous frame was found!')
-        return None, False
-
-    return images[prev_index][max_iou_index], True
+    patch = copy.deepcopy(images[prev_index][min_dist_index])
+    return True, patch
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
                         # ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
@@ -120,27 +113,38 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             # if s < 0.51:
             #     continue
             
-            is_reliable = True
             curbox = [x1,y1,x2,y2,s]
             imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
 
-            if not is_patch_reliable(curbox, rows) and index != slice_start:
-                imgbox, is_reliable = find_prev_imgbox(curbox[:4], detections, images, image_name, frame)
-
-            if is_reliable:	
+            if is_patch_reliable(curbox, rows):
                 bbimgs.append( imgbox )
                 bboxes.append( curbox )
                 bbtags.append( [x1,y1,x2,y2] )
+
+            else:
+                if index == slice_start:
+                    continue
+
+                prev_image_name = str(int(image_name)-1)
+                
+                ret, prevbox = find_prev_imgbox(transform, curbox[:4], detections, images, image_name, frame, n)
+
+                if ret != None:
+                    bbimgs.append( prevbox )
+                    bboxes.append( curbox )
+                    bbtags.append( [x1,y1,x2,y2] )
 
         if len(bbimgs) == 0:
             print ('No valid bounding boxes for frame %s' % (image_name))
             break
 
+        feats = network_feed_from_list(bbimgs, extractor)
+
         # 3. fill in dictionaries
-        detections[image_name] = bboxes
-        tags[image_name] = bbtags
-        images[image_name] = bbimgs
-        features[image_name] = network_feed_from_list(bbimgs, extractor)
+        detections[image_name] = copy.deepcopy(bboxes)
+        tags[image_name] = copy.deepcopy(bbtags)
+        images[image_name] = copy.deepcopy(bbimgs)
+        features[image_name] = copy.deepcopy(feats)
 
     print ('-> %d images have been read & processed' % (len(detections)))
 
@@ -202,7 +206,14 @@ def calc_eucl_dist(det1, det2):
     dist = np.linalg.norm(pt1_np-pt2_np)
     return dist
 
-def compute_cost(u, v, cur_box, ref_box, transform, size, alpha=0.7, maxdistance=4.0, inf=1e6):
+def return_max_dist(x):
+    return math.log(x) + 2.3
+
+def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.8, inf=1e6):
+
+    if frame_gap < 1:
+        return inf
+        
     cos_dist = distance.cosine(u, v)
 
     # test: project points (0,0,0), (1.0,0,0), (0,1.0,0), (1.0,1.0,0) to image
@@ -226,7 +237,9 @@ def compute_cost(u, v, cur_box, ref_box, transform, size, alpha=0.7, maxdistance
     dist = calc_eucl_dist([cx*transform.parameter.get("ground_width"),cy*transform.parameter.get("ground_height")], 
                         [rx*transform.parameter.get("ground_width"),ry*transform.parameter.get("ground_height")])
 
-    if dist < 0 or dist > maxdistance: 
+    maxdistance = return_max_dist(frame_gap)
+
+    if dist > maxdistance: 
         return inf
 
     dist_norm = dist / maxdistance
@@ -234,7 +247,7 @@ def compute_cost(u, v, cur_box, ref_box, transform, size, alpha=0.7, maxdistance
 
     return cost
 
-def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform, size, inf=1e6, gap=150):
+def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform, size, inf=1e6, max_gap=120):
     cost_mtx = np.zeros((len(hypothesis_t), len(hypothesis_s)))
 
     for i, index_i in enumerate(hypothesis_t):
@@ -242,15 +255,14 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, tr
             last_idx = hypothesis[index_i][-1] # tuple ('frame_num', detection_index, 'u')
             first_idx = hypothesis[index_j][0]
 
+            gap = int(first_idx[0]) - int(last_idx[0])
+
             cost_mtx[i][j] = compute_cost(features[last_idx[0]][last_idx[1]], features[first_idx[0]][first_idx[1]], 
                                             detections[last_idx[0]][last_idx[1]], detections[first_idx[0]][first_idx[1]],
-                                            transform, size)
+                                            transform, size, gap)
 
-            # check if start_i > end_i
-            if int(last_idx[0]) > int(first_idx[0]):
-                cost_mtx[i][j] = inf
             # check if gap isn't too large
-            if int(first_idx[0]) - int(last_idx[0]) > gap:
+            if gap >= max_gap:
                 cost_mtx[i][j] = inf
 
     return cost_mtx
@@ -286,4 +298,25 @@ def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, features
         hypothesis[e].clear()
 
     return
+
+def build_hypothesis_lst(flow_dict, source_idx, sink_idx):
+
+    tr_end = []
+    tr_bgn = []
+    track_hypot = []
+
+    for n, (k, _) in enumerate(flow_dict["source"].items()):
+        tr_lst = loop_get_track(k, flow_dict)
+        track_hypot.append(tr_lst)
+
+        s_node = tr_lst[0]
+        t_node = tr_lst[-1]
+
+        if s_node[0] != source_idx:
+            tr_bgn.append(n)
+
+        if t_node[0] != sink_idx:
+            tr_end.append(n)
+
+    return track_hypot, tr_bgn, tr_end
 

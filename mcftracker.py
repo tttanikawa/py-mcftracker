@@ -71,10 +71,10 @@ class MinCostFlowTracker:
         else:
             return 10000
 
-    def _calc_cost_link_appearance(self, rect1, rect2, u, v, transform, size, dbgLog=False, eps=1e-7, c=0.5, maxdist=2.0):
+    def _calc_cost_link_appearance(self, rect1, rect2, u, v, transform, size, dbgLog=False, eps=1e-7, c=0.2, maxdist=1.3):
         cos_dist = distance.cosine(u, v)
         
-        if cos_dist > 0.210:
+        if cos_dist > 0.1600:
             return 10000
 
         p1 = helper.box2midpoint_normalised(rect1, size[1], size[0])
@@ -128,7 +128,6 @@ class MinCostFlowTracker:
                     cv2.imwrite("./prev_crop.jpg", images[prev_image_name][i])
 
                 for j, j_rect in enumerate(rects):
-                    # unit_cost = int(self._calc_cost_link(i_rect, j_rect, images[prev_image_name][i], images[image_name][j], dbgLog) * 10)
                     unit_cost = int(self._calc_cost_link_appearance(i_rect, j_rect, features[prev_image_name][i], features[image_name][j], transform, size, dbgLog) * 100)
 
                     if dbgLog == True:
