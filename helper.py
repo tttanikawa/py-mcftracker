@@ -4,11 +4,8 @@ import numpy as np
 import mmcv
 
 import sys
-# sys.path.append('/root/py-mcftracker/player-feature-extractor')
-# sys.path.append('/root/bepro-python')
-
-sys.path.append('./player-feature-extractor')
-sys.path.append('/home/bepro/bepro-python')
+sys.path.append('/root/py-mcftracker/player-feature-extractor')
+sys.path.append('/root/bepro-python')
 
 import torch
 from torchreid.utils import FeatureExtractor
@@ -60,8 +57,7 @@ def find_prev_imgbox(transform, box_cur, detections, images, name, frame, bi):
     return True, patch
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
-                        # ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
-                        ckpt_path='/home/bepro/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
     
     detections = {}
     tags = {}
