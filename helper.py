@@ -44,7 +44,29 @@ def is_patch_reliable(tlbr, boxes):
             return False
 
     return True
-    
+
+def is_patch_complex_scene(index, wc, transform, tdist=5.5, tcrowd=6):
+    crowd = 0
+    cb = wc[index]
+    cx, cy = cb[0], cb[1]
+
+    for i, b in enumerate(wc):
+        if i == index:
+            continue
+
+        rx, ry = b[0], b[1]
+
+        dist = calc_eucl_dist([cx*transform.parameter.get("ground_width"),cy*transform.parameter.get("ground_height")], 
+                            [rx*transform.parameter.get("ground_width"),ry*transform.parameter.get("ground_height")])
+
+        if dist <= tdist:
+            crowd = crowd+1
+
+    if crowd >= tcrowd:
+        return True
+
+    return False
+
 def find_prev_imgbox(transform, box_cur, detections, images, name, frame, bi):
     prev_index = str(int(name)-1)
     # max_iou_index = debug.return_closest_box_index(box_cur, detections[prev_index], frame, bi)
@@ -55,6 +77,16 @@ def find_prev_imgbox(transform, box_cur, detections, images, name, frame, bi):
 
     patch = copy.deepcopy(images[prev_index][min_dist_index])
     return True, patch
+
+def convert2world(rows, size, transform):
+    wc = []
+    for n,r in enumerate(rows):
+        _, x1, y1, x2, y2, s = int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])
+        cb = [x1,y1,x2,y2,s]
+        p = box2midpoint_normalised(cb, size[1], size[0])
+        cx, cy = transform.video_to_ground(p[0], p[1])
+        wc.append((cx,cy))
+    return wc
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
                         ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
@@ -102,37 +134,25 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
         bbtags = []
         bbimgs = []
 
+        remote_bb = []
+
+        _wc = convert2world(rows, size, transform)
+
         for n,r in enumerate(rows):
             _, x1, y1, x2, y2, s = int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])
 
-            # # filtering scores less than .51, allowing vals less than .51 causes bug in graph
-            # if s < 0.51:
-            #     continue
-            
             curbox = [x1,y1,x2,y2,s]
             imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
 
-            if is_patch_reliable(curbox, rows):
+            if not is_patch_complex_scene(n, _wc, transform):
+                # check complex scene: if complex scene skip
                 bbimgs.append( imgbox )
                 bboxes.append( curbox )
                 bbtags.append( [x1,y1,x2,y2] )
 
-            else:
-                if index == slice_start:
-                    continue
-
-                prev_image_name = str(int(image_name)-1)
-                
-                ret, prevbox = find_prev_imgbox(transform, curbox[:4], detections, images, image_name, frame, n)
-
-                if ret != None:
-                    bbimgs.append( prevbox )
-                    bboxes.append( curbox )
-                    bbtags.append( [x1,y1,x2,y2] )
-
         if len(bbimgs) == 0:
-            print ('No valid bounding boxes for frame %s' % (image_name))
-            break
+            print ('no images')
+            continue
 
         feats = network_feed_from_list(bbimgs, extractor)
 
@@ -243,7 +263,7 @@ def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.8, 
 
     return cost
 
-def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform, size, inf=1e6, max_gap=120):
+def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform, size, inf=1e6, max_gap=100):
     cost_mtx = np.zeros((len(hypothesis_t), len(hypothesis_s)))
 
     for i, index_i in enumerate(hypothesis_t):
