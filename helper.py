@@ -25,6 +25,29 @@ from scipy.misc import face
 
 import math
 
+def isComplexArea(transform, xwc, size=None, frame=None):
+
+    gp = [[0, 54.16, 0], [16.5, 54.16, 0], [0, 13.84, 0], [16.5, 13.84, 0],
+            [105, 54.16, 0], [88.5, 54.16, 0], [105, 13.84, 0], [88.5, 13.84, 0]]
+
+    # for p in gp:
+    #     x,y = transform.ground_to_video(p[0]/105., p[1]/68., 0)
+    #     x = x*size[1]
+    #     y = y*size[0]
+    #     cv2.circle(frame, (int(x), int(y)), 5, (0,0,255), 5)
+
+    # cv2.imwrite('_check_goal_area.jpg', frame)
+
+    x, y = xwc[0], xwc[1]
+
+    x = x * transform.parameter.get("ground_width")
+    y = y * transform.parameter.get("ground_height")
+
+    if (x >= 0 and x<= 16.5 and y>=13.84 and y<=54.16) or (x>=88.5 and x<=105 and y>=13.84 and y<=54.16):
+        return True
+
+    return False
+
 def box2midpoint_normalised(box, iw, ih):
     w = box[2]-box[0]
     x, y = box[0] + w/2, box[3]
@@ -45,10 +68,13 @@ def is_patch_reliable(tlbr, boxes):
 
     return True
 
-def is_patch_complex_scene(index, wc, transform, tdist=5.5, tcrowd=6):
+def is_patch_complex_scene(index, wc, transform, size=None, image=None, tdist=4.0, tcrowd=6):
     crowd = 0
     cb = wc[index]
     cx, cy = cb[0], cb[1]
+
+    if not isComplexArea(transform, cb, size, image):
+        return False
 
     for i, b in enumerate(wc):
         if i == index:
@@ -134,8 +160,6 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
         bbtags = []
         bbimgs = []
 
-        remote_bb = []
-
         _wc = convert2world(rows, size, transform)
 
         for n,r in enumerate(rows):
@@ -144,7 +168,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             curbox = [x1,y1,x2,y2,s]
             imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
 
-            if not is_patch_complex_scene(n, _wc, transform):
+            if not is_patch_complex_scene(n, _wc, transform, size, frame):
                 # check complex scene: if complex scene skip
                 bbimgs.append( imgbox )
                 bboxes.append( curbox )
@@ -247,6 +271,9 @@ def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.8, 
 
     cx, cy = transform.video_to_ground(p1[0], p1[1])
     rx, ry = transform.video_to_ground(p2[0], p2[1])
+
+    if not isComplexArea(transform, (rx,ry)):
+        return inf
 
     # print (transform.parameter.get("ground_width"), transform.parameter.get("ground_height"))
 
