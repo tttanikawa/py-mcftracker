@@ -4,8 +4,11 @@ import numpy as np
 import mmcv
 
 import sys
-sys.path.append('/root/py-mcftracker/player-feature-extractor')
-sys.path.append('/root/bepro-python')
+# sys.path.append('/root/py-mcftracker/player-feature-extractor')
+# sys.path.append('/root/bepro-python')
+
+sys.path.append('/home/bepro/py-mcftracker/player-feature-extractor')
+sys.path.append('/home/bepro/bepro-python')
 
 import torch
 from torchreid.utils import FeatureExtractor
@@ -24,6 +27,19 @@ import matplotlib.pyplot as plt
 from scipy.misc import face
 
 import math
+
+def isComplexArea(transform, x):
+
+    # (0, 54.16, 0), (16.5, 54.16, 0), (0, 13.84, 0), (16.5, 13.84, 0)
+    # (105, 54.16, 0), (88.5, 54.16, 0), (105, 13.84, 0), (88.5, 13.84, 0)
+    gp = [[0, 54.16, 0], [16.5, 54.16, 0], [0, 13.84, 0], [16.5, 13.84, 0],
+            [105, 54.16, 0], [88.5, 54.16, 0], [105, 13.84, 0], [88.5, 13.84, 0]]
+
+    for p in gp:
+        x,y = transform.ground_to_video(p[0]/105., p[1]/68., 0)
+        print (x,y)
+
+    return True
 
 def box2midpoint_normalised(box, iw, ih):
     w = box[2]-box[0]
@@ -49,6 +65,8 @@ def is_patch_complex_scene(index, wc, transform, tdist=5.5, tcrowd=6):
     crowd = 0
     cb = wc[index]
     cx, cy = cb[0], cb[1]
+
+    ret = isComplexArea(transform, wc)
 
     for i, b in enumerate(wc):
         if i == index:
@@ -89,7 +107,8 @@ def convert2world(rows, size, transform):
     return wc
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
-                        ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        # ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        ckpt_path='/home/bepro/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
     
     detections = {}
     tags = {}
