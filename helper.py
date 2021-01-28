@@ -272,7 +272,7 @@ def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.8, 
     cx, cy = transform.video_to_ground(p1[0], p1[1])
     rx, ry = transform.video_to_ground(p2[0], p2[1])
 
-    if not isComplexArea(transform, (rx,ry)):
+    if isComplexArea(transform, (rx,ry)):
         return inf
 
     # print (transform.parameter.get("ground_width"), transform.parameter.get("ground_height"))
