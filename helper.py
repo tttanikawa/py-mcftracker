@@ -4,8 +4,10 @@ import numpy as np
 import mmcv
 
 import sys
-sys.path.append('/root/py-mcftracker/player-feature-extractor')
-sys.path.append('/root/bepro-python')
+# sys.path.append('/root/py-mcftracker/player-feature-extractor')
+# sys.path.append('/root/bepro-python')
+sys.path.append('/home/bepro/py-mcftracker/player-feature-extractor')
+sys.path.append('/home/bepro/bepro-python')
 
 import torch
 from torchreid.utils import FeatureExtractor
@@ -24,6 +26,8 @@ import matplotlib.pyplot as plt
 from scipy.misc import face
 
 import math
+
+from node import GraphNode
 
 def isComplexArea(transform, xwc, size=None, frame=None):
 
@@ -53,7 +57,8 @@ def box2midpoint_normalised(box, iw, ih):
     x, y = box[0] + w/2, box[3]
     return (x/iw, y/ih)
 
-def is_patch_reliable(tlbr, boxes):
+def is_box_occluded(tlbr, boxes):
+
     # calculate iou with all boxes in current frame
     for box in boxes:
         _, x1, y1, x2, y2, s = int(box[0]), float(box[1]), float(box[2]), float(box[3]), float(box[4]), float(box[5])
@@ -62,8 +67,7 @@ def is_patch_reliable(tlbr, boxes):
         if cb == tlbr:
             continue
 
-        if tools.calc_overlap(tlbr[:4], cb[:4]) > 1.0:
-        # if tools.calc_overlap(tlbr[:4], cb[:4]) > 0.1:
+        if tools.calc_overlap(tlbr[:4], cb[:4]) > 0.1:
             return False
 
     return True
@@ -115,13 +119,10 @@ def convert2world(rows, size, transform):
     return wc
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
-                        ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        ckpt_path='/home/bepro/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        # ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
     
-    detections = {}
-    tags = {}
-    images = {}
-    features = {}
-
+    input_data = {}
     video = mmcv.VideoReader(path2video)
 
     # testing torche reid import
@@ -156,41 +157,46 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
         image_name = "%d" % (index+1)
 
-        bboxes = []
-        bbtags = []
         bbimgs = []
+        node_lst = []
 
         _wc = convert2world(rows, size, transform)
 
         for n,r in enumerate(rows):
             _, x1, y1, x2, y2, s = int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])
 
-            curbox = [x1,y1,x2,y2,s]
+            curbox = [x1,y1,x2,y2]
             imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
+            
+            is_occl = False
+            is_crowd = False
 
-            if not is_patch_complex_scene(n, _wc, transform, size, frame):
-                # check complex scene: if complex scene skip
-                bbimgs.append( imgbox )
-                bboxes.append( curbox )
-                bbtags.append( [x1,y1,x2,y2] )
+            if is_patch_complex_scene(n, _wc, transform, size, frame):
+                is_crowd = True
+            if is_box_occluded(curbox, rows):
+                is_occl = True
 
+            node = GraphNode(_wc[n], curbox, s, is_occl, is_crowd)
+            
+            bbimgs.append(imgbox)
+            node_lst.append(node)
+            
         if len(bbimgs) == 0:
             print ('no images')
             continue
 
         feats = network_feed_from_list(bbimgs, extractor)
 
-        # 3. fill in dictionaries
-        detections[image_name] = copy.deepcopy(bboxes)
-        tags[image_name] = copy.deepcopy(bbtags)
-        images[image_name] = copy.deepcopy(bbimgs)
-        features[image_name] = copy.deepcopy(feats)
+        for i,node in enumerate(node_lst):
+            node._feat = feats[i]
 
-    print ('-> %d images have been read & processed' % (len(detections)))
+        input_data[image_name] = node_lst
 
-    return detections, tags, images, features, transform, size
+    print ('-> %d images have been read & processed' % (len(input_data)))
 
-def write_output_data(track_hypot, path2det, detections, slice_start, slice_end, frame_offset, iid):
+    return input_data, transform, size
+
+def write_output_data(track_hypot, path2det, data, slice_start, slice_end, frame_offset, iid):
     # write to file
     log_filename = './hypothesis.txt'
     log_file = open(log_filename, 'w')
@@ -202,7 +208,7 @@ def write_output_data(track_hypot, path2det, detections, slice_start, slice_end,
                     
                     if int(t[0]) == n:
                         bi = int(t[1])
-                        b = detections[t[0]][bi]
+                        b = data[t[0]][bi]._bb
                         # f = int(t[0]) - frame_offset
                         f = int(t[0]) if frame_offset == 0 else int(t[0]) - frame_offset + 1
                         
@@ -290,7 +296,7 @@ def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.8, 
 
     return cost
 
-def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform, size, inf=1e6, max_gap=100):
+def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size, inf=1e6, max_gap=100):
     cost_mtx = np.zeros((len(hypothesis_t), len(hypothesis_s)))
 
     for i, index_i in enumerate(hypothesis_t):
@@ -299,10 +305,14 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, tr
             first_idx = hypothesis[index_j][0]
 
             gap = int(first_idx[0]) - int(last_idx[0])
+            
+            feat_tail = data[last_idx[0]][last_idx[1]]._feat
+            feat_head = data[first_idx[0]][first_idx[1]]._feat
 
-            cost_mtx[i][j] = compute_cost(features[last_idx[0]][last_idx[1]], features[first_idx[0]][first_idx[1]], 
-                                            detections[last_idx[0]][last_idx[1]], detections[first_idx[0]][first_idx[1]],
-                                            transform, size, gap)
+            det_tail = data[last_idx[0]][last_idx[1]]._bb
+            det_head = data[first_idx[0]][first_idx[1]]._bb
+
+            cost_mtx[i][j] = compute_cost(feat_tail, feat_head, det_tail, det_head, transform, size, gap)
 
             # check if gap isn't too large
             if gap >= max_gap:
@@ -310,8 +320,8 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, tr
 
     return cost_mtx
 
-def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform, size, match_video_id=57824):
-    cost = cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform, size)
+def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, data, transform, size):
+    cost = cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size)
     
     # assignment
     row_ind, col_ind = linear_sum_assignment(cost)
