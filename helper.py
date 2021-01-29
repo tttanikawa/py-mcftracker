@@ -29,7 +29,7 @@ import math
 
 from node import GraphNode
 
-def isComplexArea(transform, xwc, size=None, frame=None):
+def isGoalArea(transform, xwc, size=None, frame=None):
 
     gp = [[0, 54.16, 0], [16.5, 54.16, 0], [0, 13.84, 0], [16.5, 13.84, 0],
             [105, 54.16, 0], [88.5, 54.16, 0], [105, 13.84, 0], [88.5, 13.84, 0]]
@@ -72,13 +72,10 @@ def is_box_occluded(tlbr, boxes):
 
     return True
 
-def is_patch_complex_scene(index, wc, transform, size=None, image=None, tdist=4.0, tcrowd=6):
+def is_patch_complex_scene(index, wc, transform, tdist=5.0, tcrowd=6):
     crowd = 0
     cb = wc[index]
     cx, cy = cb[0], cb[1]
-
-    if not isComplexArea(transform, cb, size, image):
-        return False
 
     for i, b in enumerate(wc):
         if i == index:
@@ -168,16 +165,24 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             curbox = [x1,y1,x2,y2]
             imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
             
-            is_occl = False
-            is_crowd = False
+            node = GraphNode(_wc[n], curbox, s, 0)
 
-            if is_patch_complex_scene(n, _wc, transform, size, frame):
-                is_crowd = True
-            if is_box_occluded(curbox, rows):
-                is_occl = True
+            if is_box_occluded(node._bb, rows):
+                if is_patch_complex_scene(n, node._3dc, transform, tdist=5.0):
+                    
+                    if isGoalArea(transform, node._3dc):
+                        if is_patch_complex_scene(n, node._3dc, transform, tdist=3.0):
+                            node._status = 4
+                        else:
+                            node._status = 2
+                    else:
+                        if is_patch_complex_scene(n, node._3dc, transform, tdist=1.5):
+                            node._status = 3
+                        else:
+                            node._status = 2
+                else:
+                    node._status = 1
 
-            node = GraphNode(_wc[n], curbox, s, is_occl, is_crowd)
-            
             bbimgs.append(imgbox)
             node_lst.append(node)
             
@@ -278,8 +283,8 @@ def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.8, 
     cx, cy = transform.video_to_ground(p1[0], p1[1])
     rx, ry = transform.video_to_ground(p2[0], p2[1])
 
-    if isComplexArea(transform, (rx,ry)):
-        return inf
+    # if isComplexArea(transform, (rx,ry)):
+    #     return inf
 
     # print (transform.parameter.get("ground_width"), transform.parameter.get("ground_height"))
 
@@ -313,6 +318,9 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size, i
             det_head = data[first_idx[0]][first_idx[1]]._bb
 
             cost_mtx[i][j] = compute_cost(feat_tail, feat_head, det_tail, det_head, transform, size, gap)
+            
+            if data[last_idx[0]][last_idx[1]]._status == 3 or data[last_idx[0]][last_idx[1]]._status == 4:
+                cost_mtx[i][j] = inf
 
             # check if gap isn't too large
             if gap >= max_gap:

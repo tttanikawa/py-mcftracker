@@ -73,8 +73,23 @@ class MinCostFlowTracker:
         else:
             return 10000
 
-    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, eps=1e-7, c=0.2, maxdist=1.3):
+    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, eps=1e-7):
         
+        alpha  = 0.8
+        cos_max = 0.200
+        dis_max = 1.3
+
+        if prev_node._status == 1:
+            alpha  = 0.2
+            cos_max = 0.1600
+            dis_max = 1.3
+        elif prev_node._status == 2:
+            alpha  = 1.0
+            cos_max = 1.0
+            dis_max = 1.3
+        elif prev_node._status == 3 or prev_node._status == 4:
+            return 10000
+
         u = prev_node._feat
         v = cur_node._feat
 
@@ -83,7 +98,7 @@ class MinCostFlowTracker:
 
         cos_dist = distance.cosine(u, v)
         
-        if cos_dist > 0.1600:
+        if cos_dist > cos_max:
             return 10000
 
         p1 = helper.box2midpoint_normalised(rect1, size[1], size[0])
@@ -95,14 +110,14 @@ class MinCostFlowTracker:
         dist = helper.calc_eucl_dist([cx*transform.parameter.get("ground_width"),cy*transform.parameter.get("ground_height")], 
                             [rx*transform.parameter.get("ground_width"),ry*transform.parameter.get("ground_height")])
 
-        if dist >= maxdist:
+        if dist >= dis_max:
             return 10000
 
-        dist_norm = dist / maxdist
+        dist_norm = dist / dis_max
         prob_dist = 1.0 - dist_norm
         prob_color = 1.0 - cos_dist
 
-        prob_sim = c*prob_dist + (1-c)*prob_color
+        prob_sim = alpha*prob_dist + (1.0-alpha)*prob_color
 
         return -math.log(prob_sim)
 
@@ -118,9 +133,10 @@ class MinCostFlowTracker:
             f2i_ex = 10000
 
             for i, node in enumerate(node_lst):
-                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_en))
-                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "u")], self._node2id[(image_name, i, "v")], 1, int(self._calc_cost_detection(1.0-node._score) * f2i_factor))
-                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "v")], self._node2id["sink"], 1, int(self._calc_cost_exit() * f2i_ex))
+                if node._status != 3 and node._status != 4:
+                    self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_en))
+                    self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "u")], self._node2id[(image_name, i, "v")], 1, int(self._calc_cost_detection(1.0-node._score) * f2i_factor))
+                    self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "v")], self._node2id["sink"], 1, int(self._calc_cost_exit() * f2i_ex))
 
             frame_id = self._name2id[image_name]
             
