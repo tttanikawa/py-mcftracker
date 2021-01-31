@@ -48,7 +48,8 @@ def get_patch_by_id(tracker, track_num, detections, images, features):
         out_img = rotate(rot_img, -90)
         cv2.imwrite('./id_%d_f_%s.jpg' % (track_num, cur_img_name), out_img)
 
-def visualise_hypothesis_with_detections(path2video, detections_all, slice_start, slice_end):
+# def visualise_hypothesis_with_detections(path2video, detections_all, slice_start, slice_end):
+def visualise_hypothesis_with_detections(path2video, data, slice_start, slice_end):
 
     hypothesis = np.loadtxt("./hypothesis.txt", delimiter=',')
     frame_indices = hypothesis[:, 0].astype(np.int)
@@ -73,14 +74,14 @@ def visualise_hypothesis_with_detections(path2video, detections_all, slice_start
             tid, x1, y1, w, h = int(r[1]), int(r[2]), int(r[3]), int(r[4]), int(r[5])
             cv2.putText(frame, str(tid), (x1, y1), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,255), 2)
 
-        detections = detections_all[str(frame_idx+1)]
+        node_lst = data[str(frame_idx+1)]
 
-        for d in detections:
-            # _, x1, y1, x2, y2,_ = int(d[0]), int(d[1]), int(d[2]), int(d[3]), int(d[4]), int(d[5])
+        for node in node_lst:
+            d = node._bb
             x1, y1, x2, y2 = int(d[0]), int(d[1]), int(d[2]), int(d[3])
             cv2.circle(frame, (x1+int((x2-x1)/2), y1+int((y2-y1)/2)), 2, (255,0,0), 5)
 
-        cv2.putText(frame, '# dets ' + str(len(detections)), (150, 400), cv2.FONT_HERSHEY_PLAIN, 4, (0,255,0), 4)
+        cv2.putText(frame, '# dets ' + str(len(node_lst)), (150, 400), cv2.FONT_HERSHEY_PLAIN, 4, (0,255,0), 4)
         vout.write(cv2.resize(frame, out_size))
 
     vout.release()

@@ -25,7 +25,9 @@ from scipy.misc import face
 
 import math
 
-def isComplexArea(transform, xwc, size=None, frame=None):
+from node import GraphNode
+
+def isGoalArea(transform, xwc, size=None, frame=None):
 
     gp = [[0, 54.16, 0], [16.5, 54.16, 0], [0, 13.84, 0], [16.5, 13.84, 0],
             [105, 54.16, 0], [88.5, 54.16, 0], [105, 13.84, 0], [88.5, 13.84, 0]]
@@ -53,7 +55,8 @@ def box2midpoint_normalised(box, iw, ih):
     x, y = box[0] + w/2, box[3]
     return (x/iw, y/ih)
 
-def is_patch_reliable(tlbr, boxes):
+def is_box_occluded(tlbr, boxes):
+
     # calculate iou with all boxes in current frame
     for box in boxes:
         _, x1, y1, x2, y2, s = int(box[0]), float(box[1]), float(box[2]), float(box[3]), float(box[4]), float(box[5])
@@ -62,19 +65,15 @@ def is_patch_reliable(tlbr, boxes):
         if cb == tlbr:
             continue
 
-        if tools.calc_overlap(tlbr[:4], cb[:4]) > 1.0:
-        # if tools.calc_overlap(tlbr[:4], cb[:4]) > 0.1:
+        if tools.calc_overlap(tlbr[:4], cb[:4]) > 0.1:
             return False
 
     return True
 
-def is_patch_complex_scene(index, wc, transform, size=None, image=None, tdist=4.0, tcrowd=6):
+def is_patch_complex_scene(index, wc, transform, tdist=5.0, tcrowd=6):
     crowd = 0
     cb = wc[index]
     cx, cy = cb[0], cb[1]
-
-    if not isComplexArea(transform, cb, size, image):
-        return False
 
     for i, b in enumerate(wc):
         if i == index:
@@ -117,11 +116,7 @@ def convert2world(rows, size, transform):
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
                         ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
     
-    detections = {}
-    tags = {}
-    images = {}
-    features = {}
-
+    input_data = {}
     video = mmcv.VideoReader(path2video)
 
     # testing torche reid import
@@ -156,41 +151,54 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
         image_name = "%d" % (index+1)
 
-        bboxes = []
-        bbtags = []
         bbimgs = []
+        node_lst = []
 
         _wc = convert2world(rows, size, transform)
 
         for n,r in enumerate(rows):
             _, x1, y1, x2, y2, s = int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])
 
-            curbox = [x1,y1,x2,y2,s]
+            curbox = [x1,y1,x2,y2]
             imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
+            
+            node = GraphNode(_wc[n], curbox, s, 0)
 
-            if not is_patch_complex_scene(n, _wc, transform, size, frame):
-                # check complex scene: if complex scene skip
-                bbimgs.append( imgbox )
-                bboxes.append( curbox )
-                bbtags.append( [x1,y1,x2,y2] )
+            if is_box_occluded(node._bb, rows):
+                if is_patch_complex_scene(n, node._3dc, transform, tdist=5.5):
+                    
+                    if isGoalArea(transform, node._3dc):
+                        if is_patch_complex_scene(n, node._3dc, transform, tdist=3.0):
+                            node._status = 4
+                        else:
+                            node._status = 2
+                    else:
+                        if is_patch_complex_scene(n, node._3dc, transform, tdist=2.0):
+                            node._status = 3
+                        else:
+                            node._status = 2
+                else:
+                    node._status = 1
 
+            bbimgs.append(imgbox)
+            node_lst.append(node)
+            
         if len(bbimgs) == 0:
             print ('no images')
             continue
 
         feats = network_feed_from_list(bbimgs, extractor)
 
-        # 3. fill in dictionaries
-        detections[image_name] = copy.deepcopy(bboxes)
-        tags[image_name] = copy.deepcopy(bbtags)
-        images[image_name] = copy.deepcopy(bbimgs)
-        features[image_name] = copy.deepcopy(feats)
+        for i,node in enumerate(node_lst):
+            node._feat = feats[i]
 
-    print ('-> %d images have been read & processed' % (len(detections)))
+        input_data[image_name] = node_lst
 
-    return detections, tags, images, features, transform, size
+    print ('-> %d images have been read & processed' % (len(input_data)))
 
-def write_output_data(track_hypot, path2det, detections, slice_start, slice_end, frame_offset, iid):
+    return input_data, transform, size
+
+def write_output_data(track_hypot, path2det, data, slice_start, slice_end, frame_offset, iid):
     # write to file
     log_filename = './hypothesis.txt'
     log_file = open(log_filename, 'w')
@@ -202,7 +210,7 @@ def write_output_data(track_hypot, path2det, detections, slice_start, slice_end,
                     
                     if int(t[0]) == n:
                         bi = int(t[1])
-                        b = detections[t[0]][bi]
+                        b = data[t[0]][bi]._bb
                         # f = int(t[0]) - frame_offset
                         f = int(t[0]) if frame_offset == 0 else int(t[0]) - frame_offset + 1
                         
@@ -272,8 +280,8 @@ def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.8, 
     cx, cy = transform.video_to_ground(p1[0], p1[1])
     rx, ry = transform.video_to_ground(p2[0], p2[1])
 
-    if isComplexArea(transform, (rx,ry)):
-        return inf
+    # if isComplexArea(transform, (rx,ry)):
+    #     return inf
 
     # print (transform.parameter.get("ground_width"), transform.parameter.get("ground_height"))
 
@@ -290,7 +298,7 @@ def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.8, 
 
     return cost
 
-def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform, size, inf=1e6, max_gap=100):
+def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size, inf=1e6, max_gap=100):
     cost_mtx = np.zeros((len(hypothesis_t), len(hypothesis_s)))
 
     for i, index_i in enumerate(hypothesis_t):
@@ -299,10 +307,17 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, tr
             first_idx = hypothesis[index_j][0]
 
             gap = int(first_idx[0]) - int(last_idx[0])
+            
+            feat_tail = data[last_idx[0]][last_idx[1]]._feat
+            feat_head = data[first_idx[0]][first_idx[1]]._feat
 
-            cost_mtx[i][j] = compute_cost(features[last_idx[0]][last_idx[1]], features[first_idx[0]][first_idx[1]], 
-                                            detections[last_idx[0]][last_idx[1]], detections[first_idx[0]][first_idx[1]],
-                                            transform, size, gap)
+            det_tail = data[last_idx[0]][last_idx[1]]._bb
+            det_head = data[first_idx[0]][first_idx[1]]._bb
+
+            cost_mtx[i][j] = compute_cost(feat_tail, feat_head, det_tail, det_head, transform, size, gap)
+            
+            if data[last_idx[0]][last_idx[1]]._status == 3 or data[last_idx[0]][last_idx[1]]._status == 4:
+                cost_mtx[i][j] = inf
 
             # check if gap isn't too large
             if gap >= max_gap:
@@ -310,8 +325,8 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, tr
 
     return cost_mtx
 
-def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform, size, match_video_id=57824):
-    cost = cost_matrix(hypothesis, hypothesis_t, hypothesis_s, features, detections, transform, size)
+def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, data, transform, size):
+    cost = cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size)
     
     # assignment
     row_ind, col_ind = linear_sum_assignment(cost)
