@@ -168,7 +168,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             node = GraphNode(_wc[n], curbox, s, 0)
 
             if is_box_occluded(node._bb, rows):
-                if is_patch_complex_scene(n, node._3dc, transform, tdist=5.0):
+                if is_patch_complex_scene(n, node._3dc, transform, tdist=5.5):
                     
                     if isGoalArea(transform, node._3dc):
                         if is_patch_complex_scene(n, node._3dc, transform, tdist=3.0):
@@ -176,7 +176,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
                         else:
                             node._status = 2
                     else:
-                        if is_patch_complex_scene(n, node._3dc, transform, tdist=1.5):
+                        if is_patch_complex_scene(n, node._3dc, transform, tdist=2.0):
                             node._status = 3
                         else:
                             node._status = 2
