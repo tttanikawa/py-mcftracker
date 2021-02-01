@@ -4,10 +4,8 @@ import numpy as np
 import mmcv
 
 import sys
-# sys.path.append('/root/py-mcftracker/player-feature-extractor')
-# sys.path.append('/root/bepro-python')
-sys.path.append('/home/bepro/py-mcftracker/player-feature-extractor')
-sys.path.append('/home/bepro/bepro-python')
+sys.path.append('/root/py-mcftracker/player-feature-extractor')
+sys.path.append('/root/bepro-python')
 
 import torch
 from torchreid.utils import FeatureExtractor
@@ -115,8 +113,7 @@ def convert2world(rows, size, transform):
     return wc
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
-                        ckpt_path='/home/bepro/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
-                        # ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
     
     input_data = {}
     video = mmcv.VideoReader(path2video)
@@ -226,7 +223,7 @@ def write_output_data(track_hypot, path2det, data, slice_start, slice_end, frame
                         # f = int(t[0]) if frame_offset == 0 else int(t[0]) - frame_offset + 1
                         # must be in top-left-width-height
                         log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], 1))
-                        
+
         f = f+2
 
 def extract_patch_block(patch):
