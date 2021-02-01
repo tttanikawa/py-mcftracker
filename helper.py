@@ -134,7 +134,6 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
     )
 
     size = np.zeros(2)
-    fnum = 0
 
     for index in range(slice_start, slice_end):
         frame = video[index]
@@ -143,21 +142,13 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             size = frame.shape
             cv2.imwrite("./frame.jpg", frame)
 
-        # skip frame
-        if (index-slice_start+1) % 2 == 0 and index != slice_end-1:
-            continue
-
-        fnum = fnum+1
-
-        # if (index+1) % 500 == 0:
-        if fnum % 500 == 0:
-            print ('-> reading frame %d / %d' % (fnum, slice_end))
+        if (index+1) % 500 == 0:
+            print ('-> reading frame %d / %d' % (index+1, slice_end))
 
         mask = frame_indices == (index - slice_start + 1)
         rows = det_in[mask]
 
-        # image_name = "%d" % (index+1)
-        image_name = "%d" % (fnum)
+        image_name = "%d" % (index+1)
 
         bbimgs = []
         node_lst = []
@@ -210,21 +201,17 @@ def write_output_data(track_hypot, path2det, data, slice_start, slice_end, frame
     log_filename = './hypothesis.txt'
     log_file = open(log_filename, 'w')
 
-    f = 1
     for n in range(slice_start+1, slice_end+1):
-        # f = n if frame_offset == 0 else n - frame_offset + 1
-
         for id, track in enumerate(track_hypot):
             for i, t in enumerate(track):
                 if i % 2 == 0:
+                    
                     if int(t[0]) == n:
                         bi = int(t[1])
                         b = data[t[0]][bi]._bb
-                        # f = int(t[0]) if frame_offset == 0 else int(t[0]) - frame_offset + 1
+                        f = int(t[0]) if frame_offset == 0 else int(t[0]) - frame_offset + 1
                         # must be in top-left-width-height
                         log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], 1))
-
-        f = f+2
 
 def extract_patch_block(patch):
     h, w = patch.shape[0], patch.shape[1]

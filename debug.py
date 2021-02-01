@@ -59,22 +59,13 @@ def visualise_hypothesis_with_detections(path2video, data, slice_start, slice_en
 
     video = mmcv.VideoReader(path2video)
 
-    fnum = 0
-
     for frame_idx in range(slice_start, slice_end):
         frame = video[frame_idx]
         
-        # skip frame
-        if (frame_idx-slice_start+1) % 2 == 0 and frame_idx != slice_end-1:
-            continue
-
-        fnum = fnum+1
-
-        if fnum % 500 == 0:
-            print("Frame %05d/%05d" % (fnum, slice_end))
+        if (frame_idx+1) % 500 == 0:
+            print("Frame %05d/%05d" % (frame_idx+1, slice_end))
 
         mask_h = frame_indices == (frame_idx - slice_start + 1)
-        # mask_h = frame_indices == fnum
         rows = hypothesis[mask_h]
 
         cv2.putText(frame, str(frame_idx+1), (150, 200), cv2.FONT_HERSHEY_PLAIN, 4, (0,0,255), 4)
@@ -83,8 +74,7 @@ def visualise_hypothesis_with_detections(path2video, data, slice_start, slice_en
             tid, x1, y1, w, h = int(r[1]), int(r[2]), int(r[3]), int(r[4]), int(r[5])
             cv2.putText(frame, str(tid), (x1, y1), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,255), 2)
 
-        # node_lst = data[str(frame_idx+1)]
-        node_lst = data[str(fnum)]
+        node_lst = data[str(frame_idx+1)]
 
         for node in node_lst:
             d = node._bb
