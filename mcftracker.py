@@ -77,16 +77,16 @@ class MinCostFlowTracker:
         
         alpha  = 0.8
         cos_max = 0.200
-        dis_max = 1.3
+        dis_max = 1.1
 
         if prev_node._status == 1:
             alpha  = 0.2
             cos_max = 0.1600
-            dis_max = 1.3
+            dis_max = 1.1
         elif prev_node._status == 2:
             alpha  = 1.0
             cos_max = 1.0
-            dis_max = 1.3
+            dis_max = 1.1
         elif prev_node._status == 3 or prev_node._status == 4:
             return 10000
 
