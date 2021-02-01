@@ -4,8 +4,10 @@ import numpy as np
 import mmcv
 
 import sys
-sys.path.append('/root/py-mcftracker/player-feature-extractor')
-sys.path.append('/root/bepro-python')
+# sys.path.append('/root/py-mcftracker/player-feature-extractor')
+# sys.path.append('/root/bepro-python')
+sys.path.append('/home/bepro/py-mcftracker/player-feature-extractor')
+sys.path.append('/home/bepro/bepro-python')
 
 import torch
 from torchreid.utils import FeatureExtractor
@@ -56,19 +58,18 @@ def box2midpoint_normalised(box, iw, ih):
     return (x/iw, y/ih)
 
 def is_box_occluded(tlbr, boxes):
-
     # calculate iou with all boxes in current frame
     for box in boxes:
         _, x1, y1, x2, y2, s = int(box[0]), float(box[1]), float(box[2]), float(box[3]), float(box[4]), float(box[5])
-        cb = [x1,y1,x2,y2,s]
+        cb = [x1,y1,x2,y2]
         
         if cb == tlbr:
             continue
 
-        if tools.calc_overlap(tlbr[:4], cb[:4]) > 0.1:
-            return False
+        if tools.calc_overlap(tlbr, cb) > 0.3:
+            return True
 
-    return True
+    return False
 
 def is_patch_complex_scene(index, wc, transform, tdist=5.0, tcrowd=6):
     crowd = 0
@@ -114,7 +115,8 @@ def convert2world(rows, size, transform):
     return wc
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
-                        ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        ckpt_path='/home/bepro/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        # ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
     
     input_data = {}
     video = mmcv.VideoReader(path2video)
@@ -165,15 +167,14 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             node = GraphNode(_wc[n], curbox, s, 0)
 
             if is_box_occluded(node._bb, rows):
-                if is_patch_complex_scene(n, node._3dc, transform, tdist=5.5):
-                    
+                if is_patch_complex_scene(n, _wc, transform, tdist=6.0):
                     if isGoalArea(transform, node._3dc):
-                        if is_patch_complex_scene(n, node._3dc, transform, tdist=3.0):
+                        if is_patch_complex_scene(n, _wc, transform, tdist=3.0):
                             node._status = 4
                         else:
                             node._status = 2
                     else:
-                        if is_patch_complex_scene(n, node._3dc, transform, tdist=2.0):
+                        if is_patch_complex_scene(n, _wc, transform, tdist=2.0):
                             node._status = 3
                         else:
                             node._status = 2
@@ -211,23 +212,15 @@ def write_output_data(track_hypot, path2det, data, slice_start, slice_end, frame
                     if int(t[0]) == n:
                         bi = int(t[1])
                         b = data[t[0]][bi]._bb
-                        # f = int(t[0]) - frame_offset
                         f = int(t[0]) if frame_offset == 0 else int(t[0]) - frame_offset + 1
-                        
                         # must be in top-left-width-height
-                        # log_file.write('%d, %d, %.2f, %.2f, %.2f, %.2f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2], b[3], 1))
-                        # log_file.write('%d, %d, %.2f, %.2f, %.2f, %.2f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], 1))
                         log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], 1))
 
 def extract_patch_block(patch):
-    # image.shape [h, w, c]
-    # split in 3 of height
-    # imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
     h, w = patch.shape[0], patch.shape[1]
     half_p = patch[:int(h/2), :, ]
     s = int(0.3 * w)
     roi = half_p[:, s:w-s, :]
-
     return roi
 
 def recursive_get_track(elem, dct, lst):
