@@ -4,8 +4,11 @@ import numpy as np
 import mmcv
 
 import sys
-sys.path.append('/root/py-mcftracker/player-feature-extractor')
-sys.path.append('/root/bepro-python')
+# sys.path.append('/root/py-mcftracker/player-feature-extractor')
+# sys.path.append('/root/bepro-python')
+
+sys.path.append('/home/bepro/py-mcftracker/player-feature-extractor')
+sys.path.append('/home/bepro/bepro-python')
 
 import torch
 from torchreid.utils import FeatureExtractor
@@ -113,7 +116,8 @@ def convert2world(rows, size, transform):
     return wc
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
-                        ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        # ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        ckpt_path='/home/bepro/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
     
     input_data = {}
     video = mmcv.VideoReader(path2video)
@@ -134,6 +138,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
     )
 
     size = np.zeros(2)
+    fnum = 0
 
     for index in range(slice_start, slice_end):
         frame = video[index]
@@ -142,13 +147,24 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             size = frame.shape
             cv2.imwrite("./frame.jpg", frame)
 
-        if (index+1) % 500 == 0:
-            print ('-> reading frame %d / %d' % (index+1, slice_end))
+        # skip frame
+        if (index-slice_start+1) % 2 == 0 and index != slice_end-1:
+            continue
+
+        fnum = fnum+1
+
+        # if (index+1) % 500 == 0:
+        if fnum % 500 == 0:
+            print ('-> reading frame %d / %d' % (fnum, slice_end))
+
+        # if (index+1) % 500 == 0:
+        #     print ('-> reading frame %d / %d' % (index+1, slice_end))
 
         mask = frame_indices == (index - slice_start + 1)
         rows = det_in[mask]
 
-        image_name = "%d" % (index+1)
+        # image_name = "%d" % (index+1)
+        image_name = "%d" % (fnum)
 
         bbimgs = []
         node_lst = []
@@ -164,14 +180,14 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             node = GraphNode(_wc[n], curbox, s, 0)
 
             if is_box_occluded(node._bb, rows):
-                if is_patch_complex_scene(n, _wc, transform, tdist=6.0):
+                if is_patch_complex_scene(n, _wc, transform, tdist=5.0):
                     if isGoalArea(transform, node._3dc):
-                        if is_patch_complex_scene(n, _wc, transform, tdist=3.0):
+                        if is_patch_complex_scene(n, _wc, transform, tdist=2.8):
                             node._status = 4
                         else:
                             node._status = 2
                     else:
-                        if is_patch_complex_scene(n, _wc, transform, tdist=2.0):
+                        if is_patch_complex_scene(n, _wc, transform, tdist=1.8):
                             node._status = 3
                         else:
                             node._status = 2
@@ -201,7 +217,11 @@ def write_output_data(track_hypot, path2det, data, slice_start, slice_end, frame
     log_filename = './hypothesis.txt'
     log_file = open(log_filename, 'w')
 
+    f = 1
+    all_lines = []
+
     for n in range(slice_start+1, slice_end+1):
+        lines = []
         for id, track in enumerate(track_hypot):
             for i, t in enumerate(track):
                 if i % 2 == 0:
@@ -209,9 +229,30 @@ def write_output_data(track_hypot, path2det, data, slice_start, slice_end, frame
                     if int(t[0]) == n:
                         bi = int(t[1])
                         b = data[t[0]][bi]._bb
-                        f = int(t[0]) if frame_offset == 0 else int(t[0]) - frame_offset + 1
                         # must be in top-left-width-height
-                        log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], 1))
+                        lines.append([f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], 1])
+                        # log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], 1))
+
+        all_lines.append(lines)
+        f = f+2
+
+    for i in range(len(all_lines)-1):
+        fl = sorted(all_lines[i], key=lambda x: x[1])
+        sl = sorted(all_lines[i+1], key=lambda x: x[1])
+
+        al = []
+
+        for l in fl:
+            for m in sl:
+                if m[1] == l[1]:
+                    al.append([(l[k] + m[k])/2 for k in range(len(l))])
+
+        for l in fl:
+            log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
+
+        for l in al:
+            log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
+
 
 def extract_patch_block(patch):
     h, w = patch.shape[0], patch.shape[1]
@@ -270,9 +311,6 @@ def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.8, 
     cx, cy = transform.video_to_ground(p1[0], p1[1])
     rx, ry = transform.video_to_ground(p2[0], p2[1])
 
-    # if isComplexArea(transform, (rx,ry)):
-    #     return inf
-
     # print (transform.parameter.get("ground_width"), transform.parameter.get("ground_height"))
 
     dist = calc_eucl_dist([cx*transform.parameter.get("ground_width"),cy*transform.parameter.get("ground_height")], 
@@ -306,7 +344,7 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size, i
 
             cost_mtx[i][j] = compute_cost(feat_tail, feat_head, det_tail, det_head, transform, size, gap)
             
-            if data[last_idx[0]][last_idx[1]]._status == 3 or data[last_idx[0]][last_idx[1]]._status == 4:
+            if data[last_idx[0]][last_idx[1]]._status == 3 or data[last_idx[0]][last_idx[1]]._status == 4 or data[last_idx[0]][last_idx[1]]._status == 2:
                 cost_mtx[i][j] = inf
 
             # check if gap isn't too large

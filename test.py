@@ -48,7 +48,8 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     helper.temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, data, transform, size)
     helper.write_output_data(track_hypot, path2det, data, slice_start, slice_end, frame_offset, iid)
 
-    debug.visualise_hypothesis_with_detections(path2video, data, slice_start, slice_end)
+    # debug.visualise_hypothesis_with_detections(path2video, data, slice_start, slice_end)
+    debug.visualise_hypothesis(path2video, path2det, slice_start, slice_end)
 
 if __name__ == "__main__":
     path2video = sys.argv[1]
