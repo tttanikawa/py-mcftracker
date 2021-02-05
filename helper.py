@@ -29,6 +29,7 @@ from scipy.misc import face
 import math
 
 from node import GraphNode
+from scipy import interpolate
 
 def isGoalArea(transform, xwc, size=None, frame=None):
 
@@ -364,22 +365,60 @@ def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, data, tr
     for r,c in zip(row_ind, col_ind):
         if cost[r][c] != 1e6:
             print ('id %d -> id %d - frames: [%d-%d] cost: %f' % (hypothesis_t[r]+1, hypothesis_s[c]+1, 
-                        int(hypothesis[hypothesis_t[r]][-1][0]), int(hypothesis[hypothesis_s[c]][0][0]), cost[r][c]))
+                        2*int(hypothesis[hypothesis_t[r]][-1][0]), 2*int(hypothesis[hypothesis_s[c]][0][0]), cost[r][c]))
             matches.append((hypothesis_t[r], hypothesis_s[c]))
 
-    print ('matches before sorting ==>')
-    print (matches)
     # sort matches in descending order of hypothesis_s
     matches.sort(key=lambda tup: tup[1], reverse=True)
     print ('matches after sorting ==>')
     print (matches)
 
-    # combining two tracks	
+    for s,e in matches:
+        ns = hypothesis[s][-1] # tuple ('frame_num', detection_index, 'u')
+        ne = hypothesis[e][0]
+
+        fs = int(ns[0])
+        fe = int(ne[0])
+  
+        bs = data[ns[0]][ns[1]]._bb
+        be = data[ne[0]][ne[1]]._bb
+
+        print ('%d -> %d > %s -> %s' % (fs,fe,bs,be))
+
+        fpx1 = [bs[0], be[0]]
+        fpy1 = [bs[1], be[1]]
+        fpx2 = [bs[2], be[2]]
+        fpy2 = [bs[3], be[3]]
+
+        xp = [fs, fe]
+
+        for x in range(fs+1, fe):
+            pix1 = np.interp(x, xp, fpx1)
+            piy1 = np.interp(x, xp, fpy1)
+            pix2 = np.interp(x, xp, fpx2)
+            piy2 = np.interp(x, xp, fpy2)
+
+            print ('%d -> %s' % (x, [pix1,piy1,pix2,piy2]))
+            pi = [pix1,piy1,pix2,piy2]
+
+            gn = GraphNode([0.,0.], pi, 0., 0)
+            fn = str(x)
+
+            index = len(data[fn])
+            data[fn].append(gn)
+
+            node_u = (fn, index, "u")
+            node_v = (fn, index, "v")
+
+            hypothesis[s].append(node_u)
+            hypothesis[s].append(node_v)
+
+    # # combining two tracks	
     for s,e in matches:
         for node in hypothesis[e]:
             hypothesis[s].append(node)
 
-    # deleting old track
+    # # deleting old track
     for _,e in matches:
         hypothesis[e].clear()
 
