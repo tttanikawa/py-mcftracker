@@ -4,8 +4,10 @@ import numpy as np
 import mmcv
 
 import sys
-sys.path.append('/root/py-mcftracker/player-feature-extractor')
-sys.path.append('/root/bepro-python')
+# sys.path.append('/root/py-mcftracker/player-feature-extractor')
+# sys.path.append('/root/bepro-python')
+sys.path.append('/home/bepro/py-mcftracker/player-feature-extractor')
+sys.path.append('/home/bepro/bepro-python')
 
 import torch
 from torchreid.utils import FeatureExtractor
@@ -114,7 +116,8 @@ def convert2world(rows, size, transform):
     return wc
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
-                        ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        ckpt_path='/home/bepro/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        # ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
     
     input_data = {}
     video = mmcv.VideoReader(path2video)
@@ -177,14 +180,14 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             node = GraphNode(_wc[n], curbox, s, 0)
 
             if is_box_occluded(node._bb, rows):
-                if is_patch_complex_scene(n, _wc, transform, tdist=5.0):
+                if is_patch_complex_scene(n, _wc, transform, tdist=6.0):
                     if isGoalArea(transform, node._3dc):
-                        if is_patch_complex_scene(n, _wc, transform, tdist=2.8):
+                        if is_patch_complex_scene(n, _wc, transform, tdist=3.0):
                             node._status = 4
                         else:
                             node._status = 2
                     else:
-                        if is_patch_complex_scene(n, _wc, transform, tdist=1.8):
+                        if is_patch_complex_scene(n, _wc, transform, tdist=2.0):
                             node._status = 3
                         else:
                             node._status = 2
@@ -285,7 +288,7 @@ def calc_eucl_dist(det1, det2):
 def return_max_dist(x):
     return math.log(x) + 2.3
 
-def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.8, inf=1e6):
+def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.6, inf=1e6):
 
     if frame_gap < 1:
         return inf
@@ -323,7 +326,7 @@ def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.8, 
 
     return cost
 
-def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size, inf=1e6, max_gap=100):
+def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size, inf=1e6, max_gap=60):
     cost_mtx = np.zeros((len(hypothesis_t), len(hypothesis_s)))
 
     for i, index_i in enumerate(hypothesis_t):
@@ -341,7 +344,8 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size, i
 
             cost_mtx[i][j] = compute_cost(feat_tail, feat_head, det_tail, det_head, transform, size, gap)
             
-            if data[last_idx[0]][last_idx[1]]._status == 3 or data[last_idx[0]][last_idx[1]]._status == 4 or data[last_idx[0]][last_idx[1]]._status == 2:
+            # if data[last_idx[0]][last_idx[1]]._status == 3 or data[last_idx[0]][last_idx[1]]._status == 4 or data[last_idx[0]][last_idx[1]]._status == 2:
+            if data[last_idx[0]][last_idx[1]]._status == 3 or data[last_idx[0]][last_idx[1]]._status == 4:
                 cost_mtx[i][j] = inf
 
             # check if gap isn't too large
@@ -379,7 +383,7 @@ def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, data, tr
         bs = data[ns[0]][ns[1]]._bb
         be = data[ne[0]][ne[1]]._bb
 
-        print ('%d -> %d > %s -> %s' % (fs,fe,bs,be))
+        # print ('%d -> %d > %s -> %s' % (fs,fe,bs,be))
 
         fpx1 = [bs[0], be[0]]
         fpy1 = [bs[1], be[1]]
@@ -394,7 +398,7 @@ def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, data, tr
             pix2 = np.interp(x, xp, fpx2)
             piy2 = np.interp(x, xp, fpy2)
 
-            print ('%d -> %s' % (x, [pix1,piy1,pix2,piy2]))
+            # print ('%d -> %s' % (x, [pix1,piy1,pix2,piy2]))
             pi = [pix1,piy1,pix2,piy2]
 
             gn = GraphNode([0.,0.], pi, 0., 0)
