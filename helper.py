@@ -341,7 +341,6 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size, i
 
             cost_mtx[i][j] = compute_cost(feat_tail, feat_head, det_tail, det_head, transform, size, gap)
             
-            # if data[last_idx[0]][last_idx[1]]._status == 3 or data[last_idx[0]][last_idx[1]]._status == 4 or data[last_idx[0]][last_idx[1]]._status == 2:
             if data[last_idx[0]][last_idx[1]]._status == 3 or data[last_idx[0]][last_idx[1]]._status == 4:
                 cost_mtx[i][j] = inf
 
