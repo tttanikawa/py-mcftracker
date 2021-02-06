@@ -74,19 +74,15 @@ class MinCostFlowTracker:
             return 10000
 
     def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, eps=1e-7):
-        
-        alpha  = 0.8
-        cos_max = 0.200
-        dis_max = 1.1
+        alpha  = 0.5
+        cos_max = 0.300
+        dis_max = 1.8
 
         if prev_node._status == 1:
-            alpha  = 0.2
+            alpha  = 0.3
             cos_max = 0.1600
-            dis_max = 1.1
         elif prev_node._status == 2:
-            alpha  = 1.0
-            cos_max = 1.0
-            dis_max = 1.1
+            alpha  = 0.8
         elif prev_node._status == 3 or prev_node._status == 4:
             return 10000
 

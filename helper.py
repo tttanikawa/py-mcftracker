@@ -26,6 +26,7 @@ from scipy.misc import face
 import math
 
 from node import GraphNode
+from scipy import interpolate
 
 def isGoalArea(transform, xwc, size=None, frame=None):
 
@@ -134,6 +135,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
     )
 
     size = np.zeros(2)
+    fnum = 0
 
     for index in range(slice_start, slice_end):
         frame = video[index]
@@ -142,13 +144,24 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             size = frame.shape
             cv2.imwrite("./frame.jpg", frame)
 
-        if (index+1) % 500 == 0:
-            print ('-> reading frame %d / %d' % (index+1, slice_end))
+        # skip frame
+        if (index-slice_start+1) % 2 == 0 and index != slice_end-1:
+            continue
+
+        fnum = fnum+1
+
+        # if (index+1) % 500 == 0:
+        if fnum % 500 == 0:
+            print ('-> reading frame %d / %d' % (fnum, slice_end))
+
+        # if (index+1) % 500 == 0:
+        #     print ('-> reading frame %d / %d' % (index+1, slice_end))
 
         mask = frame_indices == (index - slice_start + 1)
         rows = det_in[mask]
 
-        image_name = "%d" % (index+1)
+        # image_name = "%d" % (index+1)
+        image_name = "%d" % (fnum)
 
         bbimgs = []
         node_lst = []
@@ -201,7 +214,11 @@ def write_output_data(track_hypot, path2det, data, slice_start, slice_end, frame
     log_filename = './hypothesis.txt'
     log_file = open(log_filename, 'w')
 
+    f = 1
+    all_lines = []
+
     for n in range(slice_start+1, slice_end+1):
+        lines = []
         for id, track in enumerate(track_hypot):
             for i, t in enumerate(track):
                 if i % 2 == 0:
@@ -209,9 +226,30 @@ def write_output_data(track_hypot, path2det, data, slice_start, slice_end, frame
                     if int(t[0]) == n:
                         bi = int(t[1])
                         b = data[t[0]][bi]._bb
-                        f = int(t[0]) if frame_offset == 0 else int(t[0]) - frame_offset + 1
                         # must be in top-left-width-height
-                        log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], 1))
+                        lines.append([f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], 1])
+                        # log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], 1))
+
+        all_lines.append(lines)
+        f = f+2
+
+    for i in range(len(all_lines)-1):
+        fl = sorted(all_lines[i], key=lambda x: x[1])
+        sl = sorted(all_lines[i+1], key=lambda x: x[1])
+
+        al = []
+
+        for l in fl:
+            for m in sl:
+                if m[1] == l[1]:
+                    al.append([(l[k] + m[k])/2 for k in range(len(l))])
+
+        for l in fl:
+            log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
+
+        for l in al:
+            log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
+
 
 def extract_patch_block(patch):
     h, w = patch.shape[0], patch.shape[1]
@@ -247,7 +285,7 @@ def calc_eucl_dist(det1, det2):
 def return_max_dist(x):
     return math.log(x) + 2.3
 
-def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.8, inf=1e6):
+def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.6, inf=1e6):
 
     if frame_gap < 1:
         return inf
@@ -270,9 +308,6 @@ def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.8, 
     cx, cy = transform.video_to_ground(p1[0], p1[1])
     rx, ry = transform.video_to_ground(p2[0], p2[1])
 
-    # if isComplexArea(transform, (rx,ry)):
-    #     return inf
-
     # print (transform.parameter.get("ground_width"), transform.parameter.get("ground_height"))
 
     dist = calc_eucl_dist([cx*transform.parameter.get("ground_width"),cy*transform.parameter.get("ground_height")], 
@@ -288,7 +323,7 @@ def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.8, 
 
     return cost
 
-def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size, inf=1e6, max_gap=100):
+def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size, inf=1e6, max_gap=60):
     cost_mtx = np.zeros((len(hypothesis_t), len(hypothesis_s)))
 
     for i, index_i in enumerate(hypothesis_t):
@@ -326,22 +361,60 @@ def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, data, tr
     for r,c in zip(row_ind, col_ind):
         if cost[r][c] != 1e6:
             print ('id %d -> id %d - frames: [%d-%d] cost: %f' % (hypothesis_t[r]+1, hypothesis_s[c]+1, 
-                        int(hypothesis[hypothesis_t[r]][-1][0]), int(hypothesis[hypothesis_s[c]][0][0]), cost[r][c]))
+                        2*int(hypothesis[hypothesis_t[r]][-1][0]), 2*int(hypothesis[hypothesis_s[c]][0][0]), cost[r][c]))
             matches.append((hypothesis_t[r], hypothesis_s[c]))
 
-    print ('matches before sorting ==>')
-    print (matches)
     # sort matches in descending order of hypothesis_s
     matches.sort(key=lambda tup: tup[1], reverse=True)
     print ('matches after sorting ==>')
     print (matches)
 
-    # combining two tracks	
+    for s,e in matches:
+        ns = hypothesis[s][-1] # tuple ('frame_num', detection_index, 'u')
+        ne = hypothesis[e][0]
+
+        fs = int(ns[0])
+        fe = int(ne[0])
+  
+        bs = data[ns[0]][ns[1]]._bb
+        be = data[ne[0]][ne[1]]._bb
+
+        # print ('%d -> %d > %s -> %s' % (fs,fe,bs,be))
+
+        fpx1 = [bs[0], be[0]]
+        fpy1 = [bs[1], be[1]]
+        fpx2 = [bs[2], be[2]]
+        fpy2 = [bs[3], be[3]]
+
+        xp = [fs, fe]
+
+        for x in range(fs+1, fe):
+            pix1 = np.interp(x, xp, fpx1)
+            piy1 = np.interp(x, xp, fpy1)
+            pix2 = np.interp(x, xp, fpx2)
+            piy2 = np.interp(x, xp, fpy2)
+
+            # print ('%d -> %s' % (x, [pix1,piy1,pix2,piy2]))
+            pi = [pix1,piy1,pix2,piy2]
+
+            gn = GraphNode([0.,0.], pi, 0., 0)
+            fn = str(x)
+
+            index = len(data[fn])
+            data[fn].append(gn)
+
+            node_u = (fn, index, "u")
+            node_v = (fn, index, "v")
+
+            hypothesis[s].append(node_u)
+            hypothesis[s].append(node_v)
+
+    # # combining two tracks	
     for s,e in matches:
         for node in hypothesis[e]:
             hypothesis[s].append(node)
 
-    # deleting old track
+    # # deleting old track
     for _,e in matches:
         hypothesis[e].clear()
 
