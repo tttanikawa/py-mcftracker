@@ -4,8 +4,10 @@ import numpy as np
 import mmcv
 
 import sys
-sys.path.append('/root/py-mcftracker/player-feature-extractor')
-sys.path.append('/root/bepro-python')
+# sys.path.append('/root/py-mcftracker/player-feature-extractor')
+# sys.path.append('/root/bepro-python')
+sys.path.append('/home/bepro/py-mcftracker/player-feature-extractor')
+sys.path.append('/home/bepro/bepro-python')
 
 import torch
 from torchreid.utils import FeatureExtractor
@@ -114,7 +116,8 @@ def convert2world(rows, size, transform):
     return wc
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
-                        ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        # ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        ckpt_path='/home/bepro/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
     
     input_data = {}
     video = mmcv.VideoReader(path2video)
@@ -223,7 +226,8 @@ def write_output_data(track_hypot, path2det, data, slice_start, slice_end, frame
             for i, t in enumerate(track):
                 if i % 2 == 0:
                     
-                    if int(t[0]) == n:
+                    # if int(t[0]) == n:
+                    if int(t[0]) == (n-slice_start):
                         bi = int(t[1])
                         b = data[t[0]][bi]._bb
                         # must be in top-left-width-height
@@ -250,6 +254,10 @@ def write_output_data(track_hypot, path2det, data, slice_start, slice_end, frame
         for l in al:
             log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
 
+    # write last line
+    li = len(all_lines)-1
+    for l in all_lines[li]:
+        log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
 
 def extract_patch_block(patch):
     h, w = patch.shape[0], patch.shape[1]
@@ -283,7 +291,7 @@ def calc_eucl_dist(det1, det2):
     return dist
 
 def return_max_dist(x):
-    return math.log(x) + 2.3
+    return math.log(x) + 2.8
 
 def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.6, inf=1e6):
 
@@ -421,7 +429,6 @@ def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, data, tr
     return
 
 def build_hypothesis_lst(flow_dict, source_idx, sink_idx):
-
     tr_end = []
     tr_bgn = []
     track_hypot = []
