@@ -4,8 +4,10 @@ import numpy as np
 import mmcv
 
 import sys
-sys.path.append('/root/py-mcftracker/player-feature-extractor')
-sys.path.append('/root/bepro-python')
+# sys.path.append('/root/py-mcftracker/player-feature-extractor')
+# sys.path.append('/root/bepro-python')
+sys.path.append('/home/bepro/py-mcftracker/player-feature-extractor')
+sys.path.append('/home/bepro/bepro-python')
 
 import torch
 from torchreid.utils import FeatureExtractor
@@ -56,7 +58,7 @@ def box2midpoint_normalised(box, iw, ih):
     x, y = box[0] + w/2, box[3]
     return (x/iw, y/ih)
 
-def is_box_occluded(tlbr, boxes):
+def is_box_occluded(tlbr, boxes, t_iou=1.0):
     # calculate iou with all boxes in current frame
     for box in boxes:
         _, x1, y1, x2, y2, s = int(box[0]), float(box[1]), float(box[2]), float(box[3]), float(box[4]), float(box[5])
@@ -65,7 +67,7 @@ def is_box_occluded(tlbr, boxes):
         if cb == tlbr:
             continue
 
-        if tools.calc_overlap(tlbr, cb) > 0.3:
+        if tools.calc_overlap(tlbr, cb) > t_iou:
             return True
 
     return False
@@ -114,7 +116,8 @@ def convert2world(rows, size, transform):
     return wc
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
-                        ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        ckpt_path='/home/bepro/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        # ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
     
     input_data = {}
     video = mmcv.VideoReader(path2video)
@@ -150,17 +153,12 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
         fnum = fnum+1
 
-        # if (index+1) % 500 == 0:
         if fnum % 500 == 0:
             print ('-> reading frame %d / %d' % (fnum, slice_end))
-
-        # if (index+1) % 500 == 0:
-        #     print ('-> reading frame %d / %d' % (index+1, slice_end))
 
         mask = frame_indices == (index - slice_start + 1)
         rows = det_in[mask]
 
-        # image_name = "%d" % (index+1)
         image_name = "%d" % (fnum)
 
         bbimgs = []
@@ -176,7 +174,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             
             node = GraphNode(_wc[n], curbox, s, 0)
 
-            if is_box_occluded(node._bb, rows):
+            if is_box_occluded(node._bb, rows, t_iou=0.1):
                 if is_patch_complex_scene(n, _wc, transform, tdist=6.0):
                     if isGoalArea(transform, node._3dc):
                         if is_patch_complex_scene(n, _wc, transform, tdist=3.0):
