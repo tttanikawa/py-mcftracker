@@ -117,12 +117,12 @@ class MinCostFlowTracker:
 
         return -math.log(prob_sim)
 
-    def build_network(self, first_img_name, last_img_name, transform, size, f2i_factor=200):
+    def build_network(self, last_img_name, transform, size, f2i_factor=200):
         self.mcf = pywrapgraph.SimpleMinCostFlow()
 
         for n, (image_name, node_lst) in enumerate(sorted(self._data.items(), key=lambda t: tools.get_key(t[0]))):
 
-            if n % 100 == 0:
+            if n % 200 == 0:
                 print ('-> processing image %s / %s' % (image_name, last_img_name))
 
             f2i_en = 10000
