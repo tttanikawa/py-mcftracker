@@ -75,12 +75,12 @@ class MinCostFlowTracker:
 
     def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, eps=1e-7):
         alpha  = 0.5
-        cos_max = 0.300
+        cos_max = 0.30
         dis_max = 1.8
 
         if prev_node._status == 1:
-            alpha  = 0.2
-            cos_max = 0.1600
+            alpha  = 0.0
+            cos_max = 0.140
         elif prev_node._status == 2:
             alpha  = 0.8
         elif prev_node._status == 3 or prev_node._status == 4:
@@ -117,12 +117,12 @@ class MinCostFlowTracker:
 
         return -math.log(prob_sim)
 
-    def build_network(self, first_img_name, last_img_name, transform, size, f2i_factor=200):
+    def build_network(self, last_img_name, transform, size, f2i_factor=200):
         self.mcf = pywrapgraph.SimpleMinCostFlow()
 
         for n, (image_name, node_lst) in enumerate(sorted(self._data.items(), key=lambda t: tools.get_key(t[0]))):
 
-            if n % 100 == 0:
+            if n % 200 == 0:
                 print ('-> processing image %s / %s' % (image_name, last_img_name))
 
             f2i_en = 10000

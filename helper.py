@@ -56,7 +56,7 @@ def box2midpoint_normalised(box, iw, ih):
     x, y = box[0] + w/2, box[3]
     return (x/iw, y/ih)
 
-def is_box_occluded(tlbr, boxes):
+def is_box_occluded(tlbr, boxes, t_iou=1.0):
     # calculate iou with all boxes in current frame
     for box in boxes:
         _, x1, y1, x2, y2, s = int(box[0]), float(box[1]), float(box[2]), float(box[3]), float(box[4]), float(box[5])
@@ -65,7 +65,7 @@ def is_box_occluded(tlbr, boxes):
         if cb == tlbr:
             continue
 
-        if tools.calc_overlap(tlbr, cb) > 0.3:
+        if tools.calc_overlap(tlbr, cb) > t_iou:
             return True
 
     return False
@@ -137,6 +137,8 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
     size = np.zeros(2)
     fnum = 0
 
+    print ('-> read interval [%s-%s]' % (slice_start, slice_end))
+
     for index in range(slice_start, slice_end):
         frame = video[index]
 
@@ -145,22 +147,24 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             cv2.imwrite("./frame.jpg", frame)
 
         # skip frame
-        if (index-slice_start+1) % 2 == 0 and index != slice_end-1:
-            continue
+        # note: if index of last frame in chunk is even, throw away odd indexes and vice versa
+        # frame of last index is needed for inter-chunk connection
+        if (slice_end-1) % 2 != 0:
+            if (index-slice_start) % 2 == 0:
+                continue
+        else:
+            if (index-slice_start) % 2 != 0:
+                continue
 
         fnum = fnum+1
 
-        # if (index+1) % 500 == 0:
         if fnum % 500 == 0:
-            print ('-> reading frame %d / %d' % (fnum, slice_end))
-
-        # if (index+1) % 500 == 0:
-        #     print ('-> reading frame %d / %d' % (index+1, slice_end))
+            print ('-> reading frame %d / %d' % (fnum, slice_end-slice_start))
 
         mask = frame_indices == (index - slice_start + 1)
+        # mask = frame_indices == fnum
         rows = det_in[mask]
 
-        # image_name = "%d" % (index+1)
         image_name = "%d" % (fnum)
 
         bbimgs = []
@@ -176,7 +180,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             
             node = GraphNode(_wc[n], curbox, s, 0)
 
-            if is_box_occluded(node._bb, rows):
+            if is_box_occluded(node._bb, rows, t_iou=0.25):
                 if is_patch_complex_scene(n, _wc, transform, tdist=6.0):
                     if isGoalArea(transform, node._3dc):
                         if is_patch_complex_scene(n, _wc, transform, tdist=3.0):
@@ -189,7 +193,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
                         else:
                             node._status = 2
                 else:
-                    node._status = 1
+                        node._status = 1
 
             bbimgs.append(imgbox)
             node_lst.append(node)
@@ -202,14 +206,13 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
         for i,node in enumerate(node_lst):
             node._feat = feats[i]
-
         input_data[image_name] = node_lst
 
     print ('-> %d images have been read & processed' % (len(input_data)))
 
     return input_data, transform, size
 
-def write_output_data(track_hypot, path2det, data, slice_start, slice_end, frame_offset, iid):
+def write_output_data(track_hypot, path2det, data, iend, frame_offset, iid, n_outfr):
     # write to file
     log_filename = './hypothesis.txt'
     log_file = open(log_filename, 'w')
@@ -217,14 +220,13 @@ def write_output_data(track_hypot, path2det, data, slice_start, slice_end, frame
     f = 1
     all_lines = []
 
-    for n in range(slice_start+1, slice_end+1):
+    for n in range(1, iend):
         lines = []
         for id, track in enumerate(track_hypot):
             for i, t in enumerate(track):
                 if i % 2 == 0:
                     
-                    # if int(t[0]) == n:
-                    if int(t[0]) == (n-slice_start):
+                    if int(t[0]) == n:
                         bi = int(t[1])
                         b = data[t[0]][bi]._bb
                         # must be in top-left-width-height
@@ -233,6 +235,8 @@ def write_output_data(track_hypot, path2det, data, slice_start, slice_end, frame
 
         all_lines.append(lines)
         f = f+2
+
+    print (len(all_lines))
 
     for i in range(len(all_lines)-1):
         fl = sorted(all_lines[i], key=lambda x: x[1])
@@ -255,6 +259,11 @@ def write_output_data(track_hypot, path2det, data, slice_start, slice_end, frame
     li = len(all_lines)-1
     for l in all_lines[li]:
         log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
+
+    if n_outfr % 2 == 0:
+        for l in all_lines[li]:
+            log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0]+1, l[1], l[2], l[3], l[4], l[5], 1))
+
 
 def extract_patch_block(patch):
     h, w = patch.shape[0], patch.shape[1]

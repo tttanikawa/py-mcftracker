@@ -28,8 +28,7 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     tracker = MinCostFlowTracker(data, 0, 0.3, 0.1)
 
     print ('-> start building min cost flow graph')
-    first_img_name = 1 if slice_start == 0 else slice_start
-    tracker.build_network(str(first_img_name), str(slice_end), transform, size)
+    tracker.build_network(str(len(data)), transform, size)
 
     print ('-> finish building min cost flow graph')
     optimal_flow, optimal_cost = tracker.run(fib=True)
@@ -39,16 +38,11 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     print("Optimal number of flow: {}".format(optimal_flow))
     print("Optimal cost: {}".format(optimal_cost))
 
-    source_idx = str(slice_start+1)
-    sink_idx = str(slice_end)
-
-    print ('-> offset interval [%s-%s]' % (source_idx, sink_idx))
-    track_hypot, tr_bgn, tr_end = helper.build_hypothesis_lst(tracker.flow_dict, source_idx, sink_idx)
+    track_hypot, tr_bgn, tr_end = helper.build_hypothesis_lst(tracker.flow_dict, "1", str(len(data)))
 
     helper.temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, data, transform, size)
-    helper.write_output_data(track_hypot, path2det, data, slice_start, slice_end, frame_offset, iid)
+    helper.write_output_data(track_hypot, path2det, data, len(data)+1, frame_offset, iid, slice_end-slice_start)
 
-    # debug.visualise_hypothesis_with_detections(path2video, data, slice_start, slice_end)
     debug.visualise_hypothesis(path2video, path2det, slice_start, slice_end)
 
 if __name__ == "__main__":
