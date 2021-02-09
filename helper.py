@@ -187,7 +187,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
                         else:
                             node._status = 2
                 else:
-                    node._status = 1
+                        node._status = 1
 
             bbimgs.append(imgbox)
             node_lst.append(node)
@@ -246,13 +246,17 @@ def write_output_data(track_hypot, path2det, data, slice_start, slice_end, frame
         for l in fl:
             log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
 
-        for l in al:
-            log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
+        if (i+1) == len(all_lines)-1:
+            for l in sl:
+                log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
+        else:
+            for l in al:
+                log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
 
-    # write last line
-    li = len(all_lines)-1
-    for l in all_lines[li]:
-        log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
+    # # write last line
+    # li = len(all_lines)-1
+    # for l in all_lines[li]:
+    #     log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
 
 def extract_patch_block(patch):
     h, w = patch.shape[0], patch.shape[1]
