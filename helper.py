@@ -139,10 +139,12 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
     print ('-> video frame interval [%s-%s]' % (slice_start, slice_end-1))
 
-    parity = True
+    parity = False
 
-    if (slice_end-1) % 2 != 0:
-        parity = False
+    if slice_start %2 != 0 and (slice_end-1) % 2 != 0: # odd - odd
+        parity = True
+    elif slice_start %2 == 0 and (slice_end-1) % 2 == 0: # even - even
+        parity = True
         
     for index in range(slice_start, slice_end):
         frame = video[index]
@@ -159,7 +161,6 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
                 continue
         else:
             # instead of skipping 0 index skip 1 index
-
             if (index-slice_start) != 0 and (index-slice_start) % 2 == 0:
                 continue
             if (index-slice_start) == 1:
