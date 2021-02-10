@@ -137,8 +137,13 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
     size = np.zeros(2)
     fnum = 0
 
-    print ('-> read interval [%s-%s]' % (slice_start, slice_end))
+    print ('-> video frame interval [%s-%s]' % (slice_start, slice_end-1))
 
+    parity = True
+
+    if (slice_end-1) % 2 != 0:
+        parity = False
+        
     for index in range(slice_start, slice_end):
         frame = video[index]
 
@@ -149,11 +154,15 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
         # skip frame
         # note: if index of last frame in chunk is even, throw away odd indexes and vice versa
         # frame of last index is needed for inter-chunk connection
-        if (slice_end-1) % 2 != 0:
-            if (index-slice_start) % 2 == 0:
+        if parity:
+            if (index-slice_start) % 2 != 0:
                 continue
         else:
-            if (index-slice_start) % 2 != 0:
+            # instead of skipping 0 index skip 1 index
+
+            if (index-slice_start) != 0 and (index-slice_start) % 2 == 0:
+                continue
+            if (index-slice_start) == 1:
                 continue
 
         fnum = fnum+1
@@ -210,9 +219,9 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
     print ('-> %d images have been read & processed' % (len(input_data)))
 
-    return input_data, transform, size
+    return input_data, transform, size, parity
 
-def write_output_data(track_hypot, path2det, data, iend, frame_offset, iid, n_outfr):
+def write_output_data(track_hypot, path2det, data, iend, frame_offset, iid, parity):
     # write to file
     log_filename = './hypothesis.txt'
     log_file = open(log_filename, 'w')
@@ -238,32 +247,54 @@ def write_output_data(track_hypot, path2det, data, iend, frame_offset, iid, n_ou
 
     print (len(all_lines))
 
-    for i in range(len(all_lines)-1):
-        fl = sorted(all_lines[i], key=lambda x: x[1])
-        sl = sorted(all_lines[i+1], key=lambda x: x[1])
+    if not parity:
+        for i in range(len(all_lines)-1):
+            fl = sorted(all_lines[i], key=lambda x: x[1])
+            sl = sorted(all_lines[i+1], key=lambda x: x[1])
 
-        al = []
+            al = []
 
-        for l in fl:
-            for m in sl:
-                if m[1] == l[1]:
-                    al.append([(l[k] + m[k])/2 for k in range(len(l))])
+            for l in fl:
+                for m in sl:
+                    if m[1] == l[1]:
+                        al.append([(l[k] + m[k])/2 for k in range(len(l))])
 
-        for l in fl:
+            for l in fl:
+                log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
+
+            for l in al:
+                log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
+        
+        # last index
+        li = len(all_lines)-1
+        for l in all_lines[li]:
             log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
 
-        for l in al:
-            log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
-
-    # write last line
-    li = len(all_lines)-1
-    for l in all_lines[li]:
-        log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
-
-    if n_outfr % 2 == 0:
         for l in all_lines[li]:
             log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0]+1, l[1], l[2], l[3], l[4], l[5], 1))
 
+    else:
+        for i in range(len(all_lines)-1):
+            fl = sorted(all_lines[i], key=lambda x: x[1])
+            sl = sorted(all_lines[i+1], key=lambda x: x[1])
+
+            al = []
+
+            for l in fl:
+                for m in sl:
+                    if m[1] == l[1]:
+                        al.append([(l[k] + m[k])/2 for k in range(len(l))])
+
+            for l in fl:
+                log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
+
+            for l in al:
+                log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
+
+        # write last line
+        li = len(all_lines)-1
+        for l in all_lines[li]:
+            log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
 
 def extract_patch_block(patch):
     h, w = patch.shape[0], patch.shape[1]
