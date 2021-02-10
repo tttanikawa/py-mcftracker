@@ -21,7 +21,7 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     slice_start = 0 if frame_offset == 0 else frame_offset-1
     slice_end = min(frame_offset+frame_count, frame_offset+max_frame_idx)
 
-    data, transform, size = helper.read_input_data(
+    data, transform, size, parity = helper.read_input_data(
         path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id)
 
     start = time.time()
@@ -41,7 +41,7 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     track_hypot, tr_bgn, tr_end = helper.build_hypothesis_lst(tracker.flow_dict, "1", str(len(data)))
 
     helper.temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, data, transform, size)
-    helper.write_output_data(track_hypot, path2det, data, len(data)+1, frame_offset, iid, slice_end-slice_start)
+    helper.write_output_data(track_hypot, path2det, data, len(data)+1, frame_offset, iid, parity)
 
     debug.visualise_hypothesis(path2video, path2det, slice_start, slice_end)
 
