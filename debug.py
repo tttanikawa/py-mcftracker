@@ -130,8 +130,16 @@ def visualise_hypothesis(path2video, path2det, frame_offset, frame_count):
 
         cv2.putText(frame, str(frame_idx+1), (150, 200), cv2.FONT_HERSHEY_PLAIN, 4, (0,0,255), 4)
 
+        # log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
+
         for r in rows:	
-            tid, x1, y1, w, h = int(r[1]), int(r[2]), int(r[3]), int(r[4]), int(r[5])
+            tid, x1, y1, w, h, s = int(r[1]), int(r[2]), int(r[3]), int(r[4]), int(r[5]), int(r[9])
+
+            if s == 1:
+                cv2.rectangle(frame, (x1,y1), (x1+int(w), y1+int(h)), (255,0,0), 2)
+            elif s == 2:
+                cv2.rectangle(frame, (x1,y1), (x1+int(w), y1+int(h)), (0,255,0), 2)
+
             cv2.putText(frame, str(tid), (x1, y1), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,255), 2)
         
         for d in dets:	

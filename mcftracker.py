@@ -76,11 +76,11 @@ class MinCostFlowTracker:
     def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, eps=1e-7):
         alpha  = 0.5
         cos_max = 0.30
-        dis_max = 1.7
+        dis_max = 2.0
 
         if prev_node._status == 1:
             alpha  = 0.3
-            cos_max = 0.140
+            cos_max = 0.20
         elif prev_node._status == 2:
             alpha  = 0.8
         elif prev_node._status == 3 or prev_node._status == 4:
@@ -106,7 +106,7 @@ class MinCostFlowTracker:
         dist = helper.calc_eucl_dist([cx*transform.parameter.get("ground_width"),cy*transform.parameter.get("ground_height")], 
                             [rx*transform.parameter.get("ground_width"),ry*transform.parameter.get("ground_height")])
 
-        if dist >= dis_max:
+        if dist > dis_max:
             return 10000
 
         dist_norm = dist / dis_max

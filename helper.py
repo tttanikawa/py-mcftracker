@@ -30,8 +30,8 @@ from scipy import interpolate
 
 def isGoalArea(transform, xwc, size=None, frame=None):
 
-    gp = [[0, 54.16, 0], [16.5, 54.16, 0], [0, 13.84, 0], [16.5, 13.84, 0],
-            [105, 54.16, 0], [88.5, 54.16, 0], [105, 13.84, 0], [88.5, 13.84, 0]]
+    # gp = [[0, 54.16, 0], [16.5, 54.16, 0], [0, 13.84, 0], [16.5, 13.84, 0],
+    #         [105, 54.16, 0], [88.5, 54.16, 0], [105, 13.84, 0], [88.5, 13.84, 0]]
 
     # for p in gp:
     #     x,y = transform.ground_to_video(p[0]/105., p[1]/68., 0)
@@ -70,7 +70,7 @@ def is_box_occluded(tlbr, boxes, t_iou=1.0):
 
     return False
 
-def is_patch_complex_scene(index, wc, transform, tdist=5.0, tcrowd=6):
+def is_patch_complex_scene(index, wc, transform, tdist=5.0, tcrowd=5):
     crowd = 0
     cb = wc[index]
     cx, cy = cb[0], cb[1]
@@ -179,7 +179,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
         bbimgs = []
         node_lst = []
-
+ 
         _wc = convert2world(rows, size, transform)
 
         for n,r in enumerate(rows):
@@ -190,9 +190,9 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             
             node = GraphNode(_wc[n], curbox, s, 0)
 
-            if is_box_occluded(node._bb, rows, t_iou=0.25):
-                if is_patch_complex_scene(n, _wc, transform, tdist=6.0):
-                    if isGoalArea(transform, node._3dc):
+            if is_box_occluded(node._bb, rows, t_iou=0.10):
+                if is_patch_complex_scene(n, _wc, transform, tdist=5.0):
+                    if isGoalArea(transform, node._3dc, size, frame):
                         if is_patch_complex_scene(n, _wc, transform, tdist=3.0):
                             node._status = 4
                         else:
@@ -239,8 +239,9 @@ def write_output_data(track_hypot, path2det, data, iend, frame_offset, iid, pari
                     if int(t[0]) == n:
                         bi = int(t[1])
                         b = data[t[0]][bi]._bb
+                        s = data[t[0]][bi]._status
                         # must be in top-left-width-height
-                        lines.append([f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], 1])
+                        lines.append([f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], s])
                         # log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], 1))
 
         all_lines.append(lines)
@@ -258,21 +259,21 @@ def write_output_data(track_hypot, path2det, data, iend, frame_offset, iid, pari
             for l in fl:
                 for m in sl:
                     if m[1] == l[1]:
-                        al.append([(l[k] + m[k])/2 for k in range(len(l))])
+                        al.append([(l[k] + m[k])/2 if k!=len(l)-1 else l[k] for k in range(len(l))])
 
             for l in fl:
-                log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
+                log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
 
             for l in al:
-                log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
+                log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
         
         # last index
         li = len(all_lines)-1
         for l in all_lines[li]:
-            log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
+            log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
 
         for l in all_lines[li]:
-            log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0]+1, l[1], l[2], l[3], l[4], l[5], 1))
+            log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0]+1, l[1], l[2], l[3], l[4], l[5], l[6]))
 
     else:
         for i in range(len(all_lines)-1):
@@ -284,18 +285,18 @@ def write_output_data(track_hypot, path2det, data, iend, frame_offset, iid, pari
             for l in fl:
                 for m in sl:
                     if m[1] == l[1]:
-                        al.append([(l[k] + m[k])/2 for k in range(len(l))])
+                        al.append([(l[k] + m[k])/2 if k!=len(l)-1 else l[k] for k in range(len(l))])
 
             for l in fl:
-                log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
+                log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
 
             for l in al:
-                log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
+                log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
 
         # write last line
         li = len(all_lines)-1
         for l in all_lines[li]:
-            log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], 1))
+            log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
 
 def extract_patch_block(patch):
     h, w = patch.shape[0], patch.shape[1]
@@ -414,46 +415,46 @@ def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, data, tr
     matches.sort(key=lambda tup: tup[1], reverse=True)
     print ('matches after sorting ==>')
     print (matches)
+    
+    # for s,e in matches:
+    #     ns = hypothesis[s][-1] # tuple ('frame_num', detection_index, 'u')
+    #     ne = hypothesis[e][0]
 
-    for s,e in matches:
-        ns = hypothesis[s][-1] # tuple ('frame_num', detection_index, 'u')
-        ne = hypothesis[e][0]
-
-        fs = int(ns[0])
-        fe = int(ne[0])
+    #     fs = int(ns[0])
+    #     fe = int(ne[0])
   
-        bs = data[ns[0]][ns[1]]._bb
-        be = data[ne[0]][ne[1]]._bb
+    #     bs = data[ns[0]][ns[1]]._bb
+    #     be = data[ne[0]][ne[1]]._bb
 
-        # print ('%d -> %d > %s -> %s' % (fs,fe,bs,be))
+    #     # print ('%d -> %d > %s -> %s' % (fs,fe,bs,be))
 
-        fpx1 = [bs[0], be[0]]
-        fpy1 = [bs[1], be[1]]
-        fpx2 = [bs[2], be[2]]
-        fpy2 = [bs[3], be[3]]
+    #     fpx1 = [bs[0], be[0]]
+    #     fpy1 = [bs[1], be[1]]
+    #     fpx2 = [bs[2], be[2]]
+    #     fpy2 = [bs[3], be[3]]
 
-        xp = [fs, fe]
+    #     xp = [fs, fe]
 
-        for x in range(fs+1, fe):
-            pix1 = np.interp(x, xp, fpx1)
-            piy1 = np.interp(x, xp, fpy1)
-            pix2 = np.interp(x, xp, fpx2)
-            piy2 = np.interp(x, xp, fpy2)
+    #     for x in range(fs+1, fe):
+    #         pix1 = np.interp(x, xp, fpx1)
+    #         piy1 = np.interp(x, xp, fpy1)
+    #         pix2 = np.interp(x, xp, fpx2)
+    #         piy2 = np.interp(x, xp, fpy2)
 
-            # print ('%d -> %s' % (x, [pix1,piy1,pix2,piy2]))
-            pi = [pix1,piy1,pix2,piy2]
+    #         # print ('%d -> %s' % (x, [pix1,piy1,pix2,piy2]))
+    #         pi = [pix1,piy1,pix2,piy2]
 
-            gn = GraphNode([0.,0.], pi, 0., 0)
-            fn = str(x)
+    #         gn = GraphNode([0.,0.], pi, 0., 0)
+    #         fn = str(x)
 
-            index = len(data[fn])
-            data[fn].append(gn)
+    #         index = len(data[fn])
+    #         data[fn].append(gn)
 
-            node_u = (fn, index, "u")
-            node_v = (fn, index, "v")
+    #         node_u = (fn, index, "u")
+    #         node_v = (fn, index, "v")
 
-            hypothesis[s].append(node_u)
-            hypothesis[s].append(node_v)
+    #         hypothesis[s].append(node_u)
+    #         hypothesis[s].append(node_v)
 
     # # combining two tracks	
     for s,e in matches:
