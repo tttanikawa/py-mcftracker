@@ -73,18 +73,17 @@ class MinCostFlowTracker:
         else:
             return 10000
 
-    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, eps=1e-7):
-        alpha  = 0.5
-        cos_max = 0.30
+    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, eps=1e-9):
         dis_max = 2.0
+        cos_max = 0.20
 
-        if prev_node._status == 1:
-            alpha  = 0.3
-            cos_max = 0.20
-        elif prev_node._status == 2:
-            alpha  = 0.8
-        elif prev_node._status == 3 or prev_node._status == 4:
-            return 10000
+        # if prev_node._status == 1:
+        #     alpha  = 0.3
+        #     cos_max = 0.20
+        # elif prev_node._status == 2:
+        #     alpha  = 0.8
+        # elif prev_node._status == 3 or prev_node._status == 4:
+        #     return 10000
 
         u = prev_node._feat
         v = cur_node._feat
@@ -93,9 +92,7 @@ class MinCostFlowTracker:
         rect2 = cur_node._bb
 
         cos_dist = distance.cosine(u, v)
-        
-        if cos_dist > cos_max:
-            return 10000
+        prob_color = 1.0 - cos_dist
 
         p1 = helper.box2midpoint_normalised(rect1, size[1], size[0])
         p2 = helper.box2midpoint_normalised(rect2, size[1], size[0])
@@ -106,16 +103,22 @@ class MinCostFlowTracker:
         dist = helper.calc_eucl_dist([cx*transform.parameter.get("ground_width"),cy*transform.parameter.get("ground_height")], 
                             [rx*transform.parameter.get("ground_width"),ry*transform.parameter.get("ground_height")])
 
-        if dist > dis_max:
-            return 10000
+        if dist >= dis_max or cos_dist >= cos_max:
+            return -1
 
         dist_norm = dist / dis_max
         prob_dist = 1.0 - dist_norm
-        prob_color = 1.0 - cos_dist
+        
+        # cosine difference has no probabilistic meaning
+        # todo: add bhattacharyya distance
+        alpha  = 0.5
+        # hist1 = tools.calc_HS_histogram(prev_node._image)
+        # hist2 = tools.calc_HS_histogram(cur_node._image)
+        # prob_color = 1.0 - tools.calc_bhattacharyya_distance(hist1, hist2)
 
         prob_sim = alpha*prob_dist + (1.0-alpha)*prob_color
 
-        return -math.log(prob_sim)
+        return -math.log(prob_sim+eps)
 
     def build_network(self, last_img_name, transform, size, f2i_factor=200):
         self.mcf = pywrapgraph.SimpleMinCostFlow()
@@ -125,14 +128,11 @@ class MinCostFlowTracker:
             if n % 200 == 0:
                 print ('-> processing image %s / %s' % (image_name, last_img_name))
 
-            f2i_en = 10000
-            f2i_ex = 10000
-
             for i, node in enumerate(node_lst):
                 if node._status != 3 and node._status != 4:
-                    self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_en))
-                    self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "u")], self._node2id[(image_name, i, "v")], 1, int(self._calc_cost_detection(1.0-node._score) * f2i_factor))
-                    self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "v")], self._node2id["sink"], 1, int(self._calc_cost_exit() * f2i_ex))
+                    self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * 100000))
+                    self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "u")], self._node2id[(image_name, i, "v")], 1, int(self._calc_cost_detection(1.0-node._score) * 1000))
+                    self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "v")], self._node2id["sink"], 1, int(self._calc_cost_exit() * 100000))
 
             frame_id = self._name2id[image_name]
             
@@ -145,8 +145,13 @@ class MinCostFlowTracker:
             
             for i, i_node in enumerate(self._data[prev_image_name]):
                 for j, j_node in enumerate(node_lst):
-                    unit_cost = int(self._calc_cost_link_appearance(i_node, j_node, transform, size) * 100)
-                    self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_image_name, i, "v")], self._node2id[(image_name, j, "u")], 1, unit_cost)
+                    # unit_cost = int(self._calc_cost_link_appearance(i_node, j_node, transform, size) * 100)
+                    unit_cost = self._calc_cost_link_appearance(i_node, j_node, transform, size)
+    
+                    if unit_cost < 0:
+                        self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_image_name, i, "v")], self._node2id[(image_name, j, "u")], 1, 1000000)
+                    else:
+                        self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_image_name, i, "v")], self._node2id[(image_name, j, "u")], 1, int(unit_cost*1000))
                 
     def _make_flow_dict(self):
         self.flow_dict = {}
@@ -162,6 +167,8 @@ class MinCostFlowTracker:
     def _fibonacci_search(self, search_range=200):
         s = 0
         k_max, t = self._find_nearest_fib(self.mcf.NumNodes() // search_range)
+
+        print ('number of nodes: %d | maximum flows: %d' % (self.mcf.NumNodes(), k_max))
         cost = {}
 
         for k in range(k_max, 1, -1):
@@ -212,7 +219,7 @@ class MinCostFlowTracker:
         optimal_flow = -1
         optimal_cost = float("inf")
 
-        for flow in range(50,80):
+        for flow in range(24,100):
             self.mcf.SetNodeSupply(self._node2id["source"], flow)
             self.mcf.SetNodeSupply(self._node2id["sink"], -flow)
 
@@ -222,7 +229,7 @@ class MinCostFlowTracker:
                 print("There was an issue with the min cost flow input.")
                 sys.exit()
 
-            print ("amount of flow at source: %d / optimal cost: %d" % (flow, cost))
+            # print ("amount of flow at source: %d / optimal cost: %d" % (flow, cost))
 
             if cost < optimal_cost:
                 optimal_flow = flow
