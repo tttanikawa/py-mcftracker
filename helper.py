@@ -4,12 +4,13 @@ import numpy as np
 import mmcv
 
 import sys
-sys.path.append('/root/py-mcftracker/player-feature-extractor')
-sys.path.append('/root/bepro-python')
+# sys.path.append('/root/py-mcftracker/player-feature-extractor')
+# sys.path.append('/root/bepro-python')
+sys.path.append('/home/bepro/bepro-python')
 
 import torch
-from torchreid.utils import FeatureExtractor
-from scripts.extract_fetures import network_feed_from_list
+from pfe.torchreid.utils import FeatureExtractor
+from pfe.scripts.extract_fetures import network_feed_from_list
 
 from bepy.transform import Transform
 from bepy.models import MatchVideo
@@ -80,7 +81,6 @@ def is_patch_complex_scene(index, wc, transform, tdist=5.0, tcrowd=5):
             continue
 
         rx, ry = b[0], b[1]
-
         dist = calc_eucl_dist([cx*transform.parameter.get("ground_width"),cy*transform.parameter.get("ground_height")], 
                             [rx*transform.parameter.get("ground_width"),ry*transform.parameter.get("ground_height")])
 
@@ -110,11 +110,23 @@ def convert2world(rows, size, transform):
         cb = [x1,y1,x2,y2,s]
         p = box2midpoint_normalised(cb, size[1], size[0])
         cx, cy = transform.video_to_ground(p[0], p[1])
+        # print (cx,cy)
+        wc.append((cx,cy))
+    return wc
+
+def convert2world_post(rows, size, transform):
+    wc = []
+    for n,r in enumerate(rows):
+        _, x1, y1, w, h, _ = int(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5]), int(r[9])
+        cb = [x1,y1,x1+w,y1+h]
+        p = box2midpoint_normalised(cb, size[1], size[0])
+        cx, cy = transform.video_to_ground(p[0], p[1])
         wc.append((cx,cy))
     return wc
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
-                        ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        # ckpt_path='/root/py-mcftracker/player-feature-extractor/checkpoints/market_combined_120e.pth'):
+                        ckpt_path='/home/bepro/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
     
     input_data = {}
     video = mmcv.VideoReader(path2video)
@@ -188,22 +200,22 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             curbox = [x1,y1,x2,y2]
             imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
             
-            node = GraphNode(_wc[n], curbox, s, 0)
+            node = GraphNode(_wc[n], curbox, s, 0, copy.deepcopy(imgbox))
 
-            if is_box_occluded(node._bb, rows, t_iou=0.10):
-                if is_patch_complex_scene(n, _wc, transform, tdist=5.0):
-                    if isGoalArea(transform, node._3dc, size, frame):
-                        if is_patch_complex_scene(n, _wc, transform, tdist=3.0):
-                            node._status = 4
-                        else:
-                            node._status = 2
-                    else:
-                        if is_patch_complex_scene(n, _wc, transform, tdist=2.0):
-                            node._status = 3
-                        else:
-                            node._status = 2
-                else:
-                        node._status = 1
+            # if is_box_occluded(node._bb, rows, t_iou=0.10):
+            #     if is_patch_complex_scene(n, _wc, transform, tdist=5.0):
+            #         if isGoalArea(transform, node._3dc, size, frame):
+            #             if is_patch_complex_scene(n, _wc, transform, tdist=3.0):
+            #                 node._status = 4
+            #             else:
+            #                 node._status = 2
+            #         else:
+            #             if is_patch_complex_scene(n, _wc, transform, tdist=2.0):
+            #                 node._status = 3
+            #             else:
+            #                 node._status = 2
+            #     else:
+            #             node._status = 1
 
             bbimgs.append(imgbox)
             node_lst.append(node)
@@ -360,7 +372,8 @@ def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.6, 
     dist = calc_eucl_dist([cx*transform.parameter.get("ground_width"),cy*transform.parameter.get("ground_height")], 
                         [rx*transform.parameter.get("ground_width"),ry*transform.parameter.get("ground_height")])
 
-    maxdistance = return_max_dist(frame_gap)
+    # maxdistance = return_max_dist(frame_gap)
+    maxdistance = 4.
 
     if dist > maxdistance: 
         return inf
@@ -370,7 +383,7 @@ def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.6, 
 
     return cost
 
-def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size, inf=1e6, max_gap=60):
+def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size, inf=1e6, max_gap=100):
     cost_mtx = np.zeros((len(hypothesis_t), len(hypothesis_s)))
 
     for i, index_i in enumerate(hypothesis_t):
@@ -388,8 +401,8 @@ def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size, i
 
             cost_mtx[i][j] = compute_cost(feat_tail, feat_head, det_tail, det_head, transform, size, gap)
             
-            if data[last_idx[0]][last_idx[1]]._status == 3 or data[last_idx[0]][last_idx[1]]._status == 4:
-                cost_mtx[i][j] = inf
+            # if data[last_idx[0]][last_idx[1]]._status == 3 or data[last_idx[0]][last_idx[1]]._status == 4:
+            #     cost_mtx[i][j] = inf
 
             # check if gap isn't too large
             if gap >= max_gap:
@@ -487,3 +500,95 @@ def build_hypothesis_lst(flow_dict, source_idx, sink_idx):
 
     return track_hypot, tr_bgn, tr_end
 
+def remove_compex_scene_id(path2hypothesis, transform, size):
+    hypothesis = np.loadtxt("./hypothesis.txt", delimiter=',')
+    frame_indices = hypothesis[:, 0].astype(np.int)
+
+    min_frame_idx = frame_indices.astype(np.int).min()
+    max_frame_idx = frame_indices.astype(np.int).max()
+
+    log_filename = './hypothesis_new.txt'
+    log_file = open(log_filename, 'w')
+
+    print ("==> removing complex scene ids")
+    count = 0
+
+    for frame_idx in range(min_frame_idx, max_frame_idx):
+        rows = hypothesis[frame_indices == frame_idx]
+        
+        _wc = convert2world_post(rows, size, transform)
+
+        for n,r in enumerate(rows):
+            if is_patch_complex_scene(n, _wc, transform, tdist=3.5, tcrowd=6):
+                count = count + 1
+                continue
+
+            tid, x1, y1, w, h, s = int(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5]), int(r[9])
+            # write new result
+            log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (frame_idx, tid, x1, y1, w, h, s))
+
+    print (count)
+    # switch all appearances of tid to new id
+
+def remove_compex_scene_id_grid(path2hypothesis, transform, size):
+
+    grid = {}
+
+    v_t = 17
+    h_t = 25
+
+    gw = float(transform.parameter.get("ground_width"))
+    gh = float(transform.parameter.get("ground_height"))
+
+    x_w = gw / h_t
+    y_w = gh / v_t
+
+    x_range = [x * x_w for x in range(0, h_t)]
+    y_range = [y * y_w for y in range(0, v_t)]
+
+    for i,y in enumerate(y_range):
+        ty = [y, y+y_w]
+        for j,x in enumerate(x_range):
+            tx = [x, x+x_w]
+            pos = (i,j)
+            grid[pos] = [ty,tx]
+
+    hypothesis = np.loadtxt("./hypothesis.txt", delimiter=',')
+    frame_indices = hypothesis[:, 0].astype(np.int)
+
+    min_frame_idx = frame_indices.astype(np.int).min()
+    max_frame_idx = frame_indices.astype(np.int).max()
+
+    log_filename = './hypothesis_new.txt'
+    log_file = open(log_filename, 'w')
+
+    print ("==> removing complex scene ids")
+    b2t = {}
+
+    for frame_idx in range(min_frame_idx, max_frame_idx):
+        rows = hypothesis[frame_indices == frame_idx]
+        _wc = convert2world_post(rows, size, transform)
+        
+        for item in grid.items():
+            # item[0] -> (i,j)
+            # item[1] -> [[y1 y2],[x1 x2]]
+            pos = item[0]
+            yran = item[1][0] # [y1 y2]
+            xran = item[1][1] # [x1 x2]
+
+            b2t[pos] = []
+
+            for n,p in enumerate(_wc):
+                # p is normalised
+                xp = min(p[0]*transform.parameter.get("ground_width"), float(transform.parameter.get("ground_width")))
+                yp = min(p[1]*transform.parameter.get("ground_height"), float(transform.parameter.get("ground_height")))
+
+                if yp >= yran[0] and yp < yran[1] and xp >= xran[0] and xp < xran[1]:
+                    b2t[pos].append(n)
+
+        for item in b2t.items():
+            # item[0] -> (i,j) grid pos
+            # item[1] -> [] lst of indices in row
+
+            if len(item[1]) >= 5:
+                print ('pos (%d,%d) contains more than 5 obj' % (item[0][0], item[0][1]))
