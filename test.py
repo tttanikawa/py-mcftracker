@@ -25,13 +25,14 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
         path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id)
 
     start = time.time()
-    tracker = MinCostFlowTracker(data, 0, 0.3, 0.1)
+    tracker = MinCostFlowTracker(data, 0, 0.4, 0.2)
 
     print ('-> start building min cost flow graph')
     tracker.build_network(str(len(data)), transform, size)
 
     print ('-> finish building min cost flow graph')
-    optimal_flow, optimal_cost = tracker.run(fib=True)
+    # optimal_flow, optimal_cost = tracker.run(fib=True)
+    optimal_flow, optimal_cost = tracker.run(fib=False)
     end = time.time()
 
     print("Finished: {} sec".format(end - start))
@@ -42,7 +43,7 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
 
     helper.temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, data, transform, size)
     helper.write_output_data(track_hypot, path2det, data, len(data)+1, frame_offset, iid, parity)
-
+    helper.remove_compex_scene_id_grid("./hypothesis.txt", transform, size)
     debug.visualise_hypothesis(path2video, path2det, slice_start, slice_end)
 
 if __name__ == "__main__":

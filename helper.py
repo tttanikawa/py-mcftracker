@@ -236,7 +236,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
 def write_output_data(track_hypot, path2det, data, iend, frame_offset, iid, parity):
     # write to file
-    log_filename = './hypothesis.txt'
+    log_filename = './hypothesis_.txt'
     log_file = open(log_filename, 'w')
 
     f = 1
@@ -383,7 +383,7 @@ def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.6, 
 
     return cost
 
-def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size, inf=1e6, max_gap=100):
+def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size, inf=1e6, max_gap=70):
     cost_mtx = np.zeros((len(hypothesis_t), len(hypothesis_s)))
 
     for i, index_i in enumerate(hypothesis_t):
@@ -501,13 +501,13 @@ def build_hypothesis_lst(flow_dict, source_idx, sink_idx):
     return track_hypot, tr_bgn, tr_end
 
 def remove_compex_scene_id(path2hypothesis, transform, size):
-    hypothesis = np.loadtxt("./hypothesis.txt", delimiter=',')
+    hypothesis = np.loadtxt("./hypothesis_.txt", delimiter=',')
     frame_indices = hypothesis[:, 0].astype(np.int)
 
     min_frame_idx = frame_indices.astype(np.int).min()
     max_frame_idx = frame_indices.astype(np.int).max()
 
-    log_filename = './hypothesis_new.txt'
+    log_filename = './hypothesis.txt'
     log_file = open(log_filename, 'w')
 
     print ("==> removing complex scene ids")
@@ -531,11 +531,8 @@ def remove_compex_scene_id(path2hypothesis, transform, size):
     # switch all appearances of tid to new id
 
 def remove_compex_scene_id_grid(path2hypothesis, transform, size):
-
-    grid = {}
-
-    v_t = 17
-    h_t = 25
+    v_t = 20
+    h_t = 30
 
     gw = float(transform.parameter.get("ground_width"))
     gh = float(transform.parameter.get("ground_height"))
@@ -546,6 +543,7 @@ def remove_compex_scene_id_grid(path2hypothesis, transform, size):
     x_range = [x * x_w for x in range(0, h_t)]
     y_range = [y * y_w for y in range(0, v_t)]
 
+    grid = {}
     for i,y in enumerate(y_range):
         ty = [y, y+y_w]
         for j,x in enumerate(x_range):
@@ -553,19 +551,19 @@ def remove_compex_scene_id_grid(path2hypothesis, transform, size):
             pos = (i,j)
             grid[pos] = [ty,tx]
 
-    hypothesis = np.loadtxt("./hypothesis.txt", delimiter=',')
+    hypothesis = np.loadtxt("./hypothesis_.txt", delimiter=',')
     frame_indices = hypothesis[:, 0].astype(np.int)
 
     min_frame_idx = frame_indices.astype(np.int).min()
     max_frame_idx = frame_indices.astype(np.int).max()
 
-    log_filename = './hypothesis_new.txt'
+    log_filename = './hypothesis.txt'
     log_file = open(log_filename, 'w')
 
     print ("==> removing complex scene ids")
     b2t = {}
 
-    for frame_idx in range(min_frame_idx, max_frame_idx):
+    for frame_idx in range(min_frame_idx, max_frame_idx+1):
         rows = hypothesis[frame_indices == frame_idx]
         _wc = convert2world_post(rows, size, transform)
         
@@ -589,6 +587,13 @@ def remove_compex_scene_id_grid(path2hypothesis, transform, size):
         for item in b2t.items():
             # item[0] -> (i,j) grid pos
             # item[1] -> [] lst of indices in row
-
-            if len(item[1]) >= 5:
-                print ('pos (%d,%d) contains more than 5 obj' % (item[0][0], item[0][1]))
+            if len(item[1]) < 4:
+                for i in item[1]:
+                    r = rows[i]
+                    tid, x1, y1, w, h, s = int(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5]), int(r[9])
+                    # write new result
+                    log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (frame_idx, tid, x1, y1, w, h, s))
+            # else:
+            #     # xc1, yc1, xc2, yc2 = grid[item[0]][1][0], grid[item[0]][0][0], grid[item[0]][1][1], grid[item[0]][0][1]
+            #     # cv2.rectangle(frame, (x1,y1), (x1+int(w), y1+int(h)), (255,0,0), 2)
+            #     print ('frame: %d complex scene at tile (%d,%d)' % (frame_idx, item[0][0], item[0][1]))

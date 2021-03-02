@@ -98,7 +98,6 @@ def visualise_hypothesis_with_detections(path2video, data, slice_start, slice_en
     vout.release()
 
 def visualise_hypothesis(path2video, path2det, frame_offset, frame_count):
-
     hypothesis = np.loadtxt("./hypothesis.txt", delimiter=',')
     detections = np.loadtxt(path2det, delimiter=',')
 
