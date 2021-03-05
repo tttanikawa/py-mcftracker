@@ -12,8 +12,6 @@ import sys
 import cv2
 import tools
 
-# for cosine difference
-# from scipy.spatial import distance
 from sklearn.metrics.pairwise import cosine_similarity
 import helper
 
@@ -75,8 +73,8 @@ class MinCostFlowTracker:
             return 10000
 
     def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, eps=1e-9):
-        dis_max = 2.00
-        cos_min = 0.80
+        dis_max = 1.50
+        cos_min = 0.82
 
         u = prev_node._feat
         v = cur_node._feat
@@ -101,7 +99,7 @@ class MinCostFlowTracker:
         dist_norm = dist / dis_max
         prob_dist = 1.0 - dist_norm
         
-        alpha  = 0.5
+        alpha  = 0.6
         prob_sim = alpha*prob_dist + (1.0-alpha)*prob_color
 
         return -math.log(prob_sim+eps)
@@ -115,10 +113,9 @@ class MinCostFlowTracker:
                 print ('-> processing image %s / %s' % (image_name, last_img_name))
 
             for i, node in enumerate(node_lst):
-                if node._status != 3 and node._status != 4:
-                    self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_factor))
-                    self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "u")], self._node2id[(image_name, i, "v")], 1, int(self._calc_cost_detection(1.0-node._score) * 10000))
-                    self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "v")], self._node2id["sink"], 1, int(self._calc_cost_exit() * f2i_factor))
+                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_factor))
+                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "u")], self._node2id[(image_name, i, "v")], 1, int(self._calc_cost_detection(1.0-node._score) * 10000))
+                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "v")], self._node2id["sink"], 1, int(self._calc_cost_exit() * f2i_factor))
 
             frame_id = self._name2id[image_name]
             
@@ -204,7 +201,7 @@ class MinCostFlowTracker:
         optimal_flow = -1
         optimal_cost = float("inf")
 
-        for flow in range(60,155):
+        for flow in range(60,160):
             self.mcf.SetNodeSupply(self._node2id["source"], flow)
             self.mcf.SetNodeSupply(self._node2id["sink"], -flow)
 
@@ -213,8 +210,6 @@ class MinCostFlowTracker:
             else:
                 print("There was an issue with the min cost flow input.")
                 sys.exit()
-
-            # print ("amount of flow at source: %d / optimal cost: %d" % (flow, cost))
 
             if cost < optimal_cost:
                 optimal_flow = flow
