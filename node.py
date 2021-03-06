@@ -1,5 +1,4 @@
 class GraphNode:
-
     def __init__(self, wc, bb, score, status, image, feat_v=None):
         self._3dc = wc
         self._bb = bb
