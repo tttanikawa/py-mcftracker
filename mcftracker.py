@@ -28,7 +28,7 @@ class MinCostFlowTracker:
         self._min_thresh = min_thresh
 
         self.P_enter = P_enter
-        self.P_exit = self.P_enter
+        self.P_exit = P_exit
 
         self._id2name = tools.map_id2name(data)
         self._name2id = tools.map_name2id(data)
@@ -44,6 +44,11 @@ class MinCostFlowTracker:
         elif n > 1:
             return self._fib_cache.setdefault(n, self._fib(n - 1) + self._fib(n - 2))
         return n
+
+    def _return_max_dist(self,x):
+        if x == 1:
+            return 1.2
+        return 4*math.log10(x)
 
     def _find_nearest_fib(self, num):
         for n in range(num):
@@ -71,7 +76,45 @@ class MinCostFlowTracker:
             return -math.log(prob_sim + eps)
         else:
             return 10000
+    
+    def _calc_cost_tracklet(self, prev_node, cur_node, transform, max_gap=80, a=0.25, eps=1e-9, inf=-1):
+        # last frame index of prev_node
+        # first frame index of cur_node
+        lfPn = prev_node._efIdx
+        ffCn = cur_node._sfIdx
 
+        # wc of end of prev_node
+        # wc of start of cur_node
+        wcEPn = prev_node._e3dc
+        wcSCn = cur_node._s3dc
+
+        # difference in frame index
+        fdiff = ffCn - lfPn
+        
+        if fdiff < 1 or fdiff > max_gap:
+            return inf
+
+        maxDist = self._return_max_dist(fdiff)
+
+        # euclidian diff of wc
+        cx, cy = wcSCn[0], wcSCn[1] 
+        rx, ry = wcEPn[0], wcEPn[1]
+
+        dist = helper.calc_eucl_dist([cx*transform.parameter.get("ground_width"),cy*transform.parameter.get("ground_height")], 
+                    [rx*transform.parameter.get("ground_width"),ry*transform.parameter.get("ground_height")])
+
+        if dist<0 or dist > maxDist:
+            return inf
+
+        # normalise dist
+        # normalise frame diff
+        dist_n = dist / maxDist
+        fdiff_n = fdiff / max_gap
+
+        prob = a*(1.0-dist_n) + (1-a)*(1.0-fdiff_n)
+
+        return -math.log(prob+eps)
+    
     def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, eps=1e-9):
         dis_max = 1.50
         cos_min = 0.82
@@ -135,25 +178,28 @@ class MinCostFlowTracker:
                     else:
                         self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_image_name, i, "v")], self._node2id[(image_name, j, "u")], 1, int(unit_cost*10000))
 
-    def build_network_tracklet(self, transform, f2i_factor=1000):
+    def build_network_tracklet(self, transform):
         self.mcf = pywrapgraph.SimpleMinCostFlow()
 
-        for _, (ttype, node_lst) in enumerate(sorted(self._data.items(), key=lambda t: tools.get_key(t[0]))):
+        for ttype, node_lst in sorted(self._data.items(), key=lambda t: tools.get_key(t[0])):
 
-            for i, node in enumerate(node_lst):
-                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(ttype, i, "u")], 1, int(self._calc_cost_enter() * f2i_factor))
-                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(ttype, i, "u")], self._node2id[(ttype, i, "v")], 1, int(self._calc_cost_detection(1.0-node._score) * 10000))
-                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(ttype, i, "v")], self._node2id["sink"], 1, int(self._calc_cost_exit() * f2i_factor))
+            for i, _ in enumerate(node_lst):
+                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(ttype, i, "u")], 1, 1000)
+                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(ttype, i, "u")], self._node2id[(ttype, i, "v")], 1, -10000)
+                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(ttype, i, "v")], self._node2id["sink"], 1, 1000)
 
             tp = self._name2id[ttype]
-            
+
             if tp != 0:
                 prev_type = self._id2name[tp - 1]
                 for i, i_node in enumerate(self._data[prev_type]):
                     for j, j_node in enumerate(node_lst):
-                        unit_cost = self._calc_cost_tracklet()
-                        self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_type, i, "v")], self._node2id[(ttype, j, "u")], 1, int(unit_cost*10000))
-
+                        cost = self._calc_cost_tracklet(i_node, j_node, transform)
+    
+                        if cost < 0:
+                            self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_type, i, "v")], self._node2id[(ttype, j, "u")], 1, 100000)
+                        else:
+                            self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_type, i, "v")], self._node2id[(ttype, j, "u")], 1, int(cost*10000))
 
                 if tp == 1:
                     # connection betweem nodes in nht (no-head-tail)
@@ -162,8 +208,12 @@ class MinCostFlowTracker:
 
                     for i in range(len(nlst)-1):
                         for j in range(i+1, len(nlst)):
-                            unit_cost = self._calc_cost_tracklet()
-                            self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(tnht, i, "v")], self._node2id[(tnht, j, "u")], 1, int(unit_cost*10000))
+                            cost = self._calc_cost_tracklet(nlst[i], nlst[j], transform)
+
+                        if cost < 0:
+                            self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(tnht, i, "v")], self._node2id[(tnht, j, "u")], 1, 100000)
+                        else:
+                            self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(tnht, i, "v")], self._node2id[(tnht, j, "u")], 1, int(cost*10000))
 
         return
 
@@ -229,11 +279,11 @@ class MinCostFlowTracker:
         self._make_flow_dict()
         return (s, optimal_cost)
 
-    def _brute_force(self, search_range=100):
+    def _brute_force(self, min_flow, max_flow, search_range=100):
         optimal_flow = -1
         optimal_cost = float("inf")
 
-        for flow in range(60,160):
+        for flow in range(min_flow, max_flow):
             self.mcf.SetNodeSupply(self._node2id["source"], flow)
             self.mcf.SetNodeSupply(self._node2id["sink"], -flow)
 
@@ -247,12 +297,12 @@ class MinCostFlowTracker:
                 optimal_flow = flow
                 optimal_cost = cost
                 self._make_flow_dict()
-                
+        
         return (optimal_flow, optimal_cost)
 
-    def run(self, fib=False):
+    def run(self, min_flow, max_flow, fib=False):
         if fib:
             return self._fibonacci_search()
         else:
-            return self._brute_force()
+            return self._brute_force(min_flow, max_flow)
 
