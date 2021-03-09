@@ -3,6 +3,8 @@ from TrackletNode import TrackletNode
 from mcftracker import MinCostFlowTracker
 import helper
 
+import json
+
 def tracklet_matching(tracklets, nh, nt, nht, data):
     # create data sctruct
     types = [nt, nht, nh]
@@ -88,12 +90,38 @@ def hypot2id(hypot, idx_data, ttype, all_tracklets, data_in, transform):
         
         print ('-----------------------------------------------------------')
 
-def cost_flow_tracklet(assoc_tracklets, nh, nt, nht, data_in, transform):
+# def cost_flow_tracklet(assoc_tracklets, nh, nt, nht, data_in, transform):
+def cost_flow_tracklet(data_in, transform):
+
+    with open('./tracklets.json') as f:
+        assoc_tracklets = json.load(f)
+
+    with open('./nh.json') as f:
+        nh = json.load(f)
+
+    with open('./nt.json') as f:
+        nt = json.load(f)
+
+    with open('./nht.json') as f:
+        nht = json.load(f)
+
     trklt_data, idx_data, type_data = tracklet_matching(assoc_tracklets, nh, nt, nht, data_in)
 
-    graph = MinCostFlowTracker(trklt_data, 0, 0.2, 0.2)
+    # with open('./tracklets.json', 'w', encoding='utf-8') as f:
+    #     json.dump(assoc_tracklets, f, ensure_ascii=False)
+    
+    # with open('./nh.json', 'w', encoding='utf-8') as f:
+    #     json.dump(nh, f, ensure_ascii=False)
+
+    # with open('./nt.json', 'w', encoding='utf-8') as f:
+    #     json.dump(nt, f, ensure_ascii=False)
+
+    # with open('./nht.json', 'w', encoding='utf-8') as f:
+    #     json.dump(nht, f, ensure_ascii=False)
+
+    graph = MinCostFlowTracker(trklt_data, 0, 0.1, 0.1)
     graph.build_network_tracklet(transform)
-    optimal_flow, optimal_cost = graph.run(0, len(trklt_data["1"])+1, fib=False)
+    optimal_flow, optimal_cost = graph.run(0, max(len(trklt_data["3"]), max(len(trklt_data["1"]), len(trklt_data["2"])))+1, fib=False)
     print("Optimal number of flow: {}".format(optimal_flow))
     print("Optimal cost: {}".format(optimal_cost))
     hypot, _, _, _ = helper.build_hypothesis_lst(graph.flow_dict, "1", "3")
