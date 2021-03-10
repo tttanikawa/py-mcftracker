@@ -24,30 +24,30 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     data, transform, size, parity, _wc, lf_i = helper.read_input_data(
         path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id)
 
-    tracklet_matching.cost_flow_tracklet(data, transform)
-
+    tracks = tracklet_matching.cost_flow_tracklet(data, transform)
+    helper.write_output_data(tracks, path2det, data, len(data)+1, frame_offset, iid, parity)
+    debug.visualise_tracks(path2video, slice_start, slice_end, _wc, transform, size)
     return
 
-    # start = time.time()
-    tracker = MinCostFlowTracker(data, 0, 0.3, 0.3)
+    start = time.time()
+    tracker = MinCostFlowTracker(data, 0, 0.1, 0.1)
 
     print ('-> start building min cost flow graph')
     tracker.build_network(str(len(data)), transform, size)
 
     print ('-> finish building min cost flow graph')
-    # optimal_flow, optimal_cost = tracker.run(fib=True)
-    optimal_flow, optimal_cost = tracker.run(60, 160, fib=False)
-    # end = time.time()
+    optimal_flow, optimal_cost = tracker.run(0, 0, fib=True)
+    # optimal_flow, optimal_cost = tracker.run(25, 160, fib=False)
+    end = time.time()
 
-    # print("Finished: {} sec".format(end - start))
+    print("Finished: {} sec".format(end - start))
     print("Optimal number of flow: {}".format(optimal_flow))
     print("Optimal cost: {}".format(optimal_cost))
 
     track_hypot, nt, nh, nht = helper.build_hypothesis_lst(tracker.flow_dict, "1", lf_i)
-    # helper.temporal_hungarian_matching(track_hypot, tr_end, tr_bgn, data, transform, size)
-    tracklet_matching.cost_flow_tracklet(track_hypot, nh, nt, nht, data, transform)
+    tracks = tracklet_matching.cost_flow_tracklet(track_hypot, nh, nt, nht, data, transform)
 
-    helper.write_output_data(track_hypot, path2det, data, len(data)+1, frame_offset, iid, parity)
+    helper.write_output_data(tracks, path2det, data, len(data)+1, frame_offset, iid, parity)
     debug.visualise_tracks(path2video, slice_start, slice_end, _wc, transform, size)
 
 if __name__ == "__main__":

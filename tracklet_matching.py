@@ -8,23 +8,23 @@ import json
 def tracklet_matching(tracklets, nh, nt, nht, data):
     # create data sctruct
     types = [nt, nht, nh]
-    types_s = []
-    indices_s = []
     tracklet_data = {}
 
     # sort node_lst by index of last frame
-    for ilst in types:
-        ends = []
-        for ti in ilst:            
-            _, e = tracklets[ti][0], tracklets[ti][-1]
-            ends.append(int(e[0]))
+    # for ilst in types:
+    #     ends = []
+    #     for ti in ilst:            
+    #         s, e = tracklets[ti][0], tracklets[ti][-1]
+    #         # ends.append(int(e[0]))
+    #         ends.append(int(s[0]))
         
-        ordIdx = [i[0] for i in sorted(enumerate(ends), key=lambda x:x[1])]
-        indices_s.append(ordIdx)
+    #     ordIdx = [i[0] for i in sorted(enumerate(ends), key=lambda x:x[1])]
+    #     indices_s.append(ordIdx)
 
-        types_s.append([ilst[i] for i in ordIdx])
+    #     types_s.append([ilst[i] for i in ordIdx])
         
-    for i, ilst in enumerate(types_s):
+    # for i, ilst in enumerate(types_s):
+    for i, ilst in enumerate(types):
         node_lst = []
 
         for idx in ilst:
@@ -45,9 +45,9 @@ def tracklet_matching(tracklets, nh, nt, nht, data):
         
         tracklet_data[str(i+1)] = node_lst
 
-    return tracklet_data, indices_s, types
+    return tracklet_data, types
 
-def hypot2id(hypot, idx_data, ttype, all_tracklets, data_in, transform):
+def hypot2id(hypot, ttype, all_tracklets, data_in, transform):
     matches = []
     for hpt in hypot:
         match = []
@@ -55,8 +55,9 @@ def hypot2id(hypot, idx_data, ttype, all_tracklets, data_in, transform):
             if n%2 != 0:
                 sIdx = h[1]
                 sTypeIdx = int(h[0])-1
-                oIdx = idx_data[sTypeIdx][sIdx]
-                idM = ttype[sTypeIdx][oIdx]
+                # oIdx = idx_data[sTypeIdx][sIdx]
+                # idM = ttype[sTypeIdx][oIdx]
+                idM = ttype[sTypeIdx][sIdx]
                 match.append((idM, sTypeIdx+1))
         matches.append(match)
 
@@ -89,6 +90,8 @@ def hypot2id(hypot, idx_data, ttype, all_tracklets, data_in, transform):
             print ('%d -> %d dist=%f fdiff=%d' % (nexId, curId, dist, fdiff))
         
         print ('-----------------------------------------------------------')
+    
+    return matches
 
 # def cost_flow_tracklet(assoc_tracklets, nh, nt, nht, data_in, transform):
 def cost_flow_tracklet(data_in, transform):
@@ -105,26 +108,48 @@ def cost_flow_tracklet(data_in, transform):
     with open('./nht.json') as f:
         nht = json.load(f)
 
-    trklt_data, idx_data, type_data = tracklet_matching(assoc_tracklets, nh, nt, nht, data_in)
+    # with open('./tracklets.json', 'w') as f:
+    #     json.dump(assoc_tracklets, f)
 
-    # with open('./tracklets.json', 'w', encoding='utf-8') as f:
-    #     json.dump(assoc_tracklets, f, ensure_ascii=False)
-    
-    # with open('./nh.json', 'w', encoding='utf-8') as f:
-    #     json.dump(nh, f, ensure_ascii=False)
+    # with open('./nh.json', 'w') as f:
+    #     json.dump(nh, f)
 
-    # with open('./nt.json', 'w', encoding='utf-8') as f:
-    #     json.dump(nt, f, ensure_ascii=False)
+    # with open('./nt.json', 'w') as f:
+    #     json.dump(nt, f)
 
-    # with open('./nht.json', 'w', encoding='utf-8') as f:
-    #     json.dump(nht, f, ensure_ascii=False)
+    # with open('./nht.json', 'w') as f:
+    #     json.dump(nht, f)
 
-    graph = MinCostFlowTracker(trklt_data, 0, 0.1, 0.1)
+    print ('nh', nh)
+    print ('nt', nt)
+    print ('nht', nht)
+
+    # return assoc_tracklets
+
+    trklt_data, type_data = tracklet_matching(assoc_tracklets, nh, nt, nht, data_in)
+    graph = MinCostFlowTracker(trklt_data, 0, 0.3, 0.1)
     graph.build_network_tracklet(transform)
-    optimal_flow, optimal_cost = graph.run(0, max(len(trklt_data["3"]), max(len(trklt_data["1"]), len(trklt_data["2"])))+1, fib=False)
+    optimal_flow, optimal_cost = graph.run(0, max(len(trklt_data["1"]), len(trklt_data["3"]))+1, fib=False)
+    # optimal_flow, optimal_cost = graph.run(0, 0, fib=True)
     print("Optimal number of flow: {}".format(optimal_flow))
     print("Optimal cost: {}".format(optimal_cost))
     hypot, _, _, _ = helper.build_hypothesis_lst(graph.flow_dict, "1", "3")
     
     # convert hypot to format: id1 -> id2 -> id3 
-    hypot2id(hypot, idx_data, type_data, assoc_tracklets, data_in, transform)
+    matches = hypot2id(hypot,type_data, assoc_tracklets, data_in, transform)
+
+    # combining tracks	
+    for match in matches:
+        for i in range(1,len(match)):
+                trklt_s = assoc_tracklets[match[0][0]]
+                trklt_d = assoc_tracklets[match[i][0]]
+                for node in trklt_d:
+                    trklt_s.append(node)
+    
+    # erasing old tracks
+    for match in matches:
+        for i in range(1,len(match)):
+            assoc_tracklets[match[i][0]].clear()
+
+    return assoc_tracklets
+
