@@ -24,10 +24,10 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     data, transform, size, parity, _wc, lf_i = helper.read_input_data(
         path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id)
 
-    tracks = tracklet_matching.cost_flow_tracklet(data, transform)
-    helper.write_output_data(tracks, path2det, data, len(data)+1, frame_offset, iid, parity)
-    debug.visualise_tracks(path2video, slice_start, slice_end, _wc, transform, size)
-    return
+    # tracks = tracklet_matching.cost_flow_tracklet(data, transform)
+    # helper.write_output_data(tracks, path2det, data, len(data)+1, frame_offset, iid, parity)
+    # debug.visualise_tracks(path2video, slice_start, slice_end, _wc, transform, size)
+    # return
 
     start = time.time()
     tracker = MinCostFlowTracker(data, 0, 0.1, 0.1)
@@ -45,9 +45,9 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     print("Optimal cost: {}".format(optimal_cost))
 
     track_hypot, nt, nh, nht = helper.build_hypothesis_lst(tracker.flow_dict, "1", lf_i)
-    tracks = tracklet_matching.cost_flow_tracklet(track_hypot, nh, nt, nht, data, transform)
-
-    helper.write_output_data(tracks, path2det, data, len(data)+1, frame_offset, iid, parity)
+    # tracks = tracklet_matching.cost_flow_tracklet(track_hypot, nh, nt, nht, data, transform)
+    # helper.write_output_data(tracks, path2det, data, len(data)+1, frame_offset, iid, parity)
+    helper.write_output_data(track_hypot, path2det, data, len(data)+1, frame_offset, iid, parity)
     debug.visualise_tracks(path2video, slice_start, slice_end, _wc, transform, size)
 
 if __name__ == "__main__":

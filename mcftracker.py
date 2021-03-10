@@ -119,7 +119,7 @@ class MinCostFlowTracker:
         return -math.log(prob+eps)
     
     def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, eps=1e-9):
-        dis_max = 1.50
+        dis_max = 1.80
         # cos_min = 0.70
 
         u = prev_node._feat
@@ -139,7 +139,7 @@ class MinCostFlowTracker:
         dist = helper.calc_eucl_dist([cx*transform.parameter.get("ground_width"),cy*transform.parameter.get("ground_height")], 
                             [rx*transform.parameter.get("ground_width"),ry*transform.parameter.get("ground_height")])
 
-        if dist >= dis_max:
+        if dist > dis_max:
             return -1 
 
         dist_norm = dist / dis_max
@@ -150,6 +150,7 @@ class MinCostFlowTracker:
 
         return -math.log(prob_sim+eps)
 
+    # def build_network(self, last_img_name, transform, size, f2i_factor=100000):
     def build_network(self, last_img_name, transform, size, f2i_factor=100000):
         self.mcf = pywrapgraph.SimpleMinCostFlow()
 
@@ -179,7 +180,8 @@ class MinCostFlowTracker:
                     if unit_cost < 0:
                         self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_image_name, i, "v")], self._node2id[(image_name, j, "u")], 1, 1000000)
                     else:
-                        self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_image_name, i, "v")], self._node2id[(image_name, j, "u")], 1, int(unit_cost*10000))
+                        # self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_image_name, i, "v")], self._node2id[(image_name, j, "u")], 1, int(unit_cost*10000))
+                        self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_image_name, i, "v")], self._node2id[(image_name, j, "u")], 1, int(unit_cost*1000))
 
     def build_network_tracklet(self, transform, f2i_factor=6000):
         self.mcf = pywrapgraph.SimpleMinCostFlow()
