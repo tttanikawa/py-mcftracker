@@ -107,17 +107,17 @@ def cost_flow_tracklet(assoc_tracklets, nh, nt, nht, data_in, transform):
     # with open('./nht.json') as f:
     #     nht = json.load(f)
 
-    with open('./tracklets.json', 'w') as f:
-        json.dump(assoc_tracklets, f)
+    # with open('./tracklets.json', 'w') as f:
+    #     json.dump(assoc_tracklets, f)
 
-    with open('./nh.json', 'w') as f:
-        json.dump(nh, f)
+    # with open('./nh.json', 'w') as f:
+    #     json.dump(nh, f)
 
-    with open('./nt.json', 'w') as f:
-        json.dump(nt, f)
+    # with open('./nt.json', 'w') as f:
+    #     json.dump(nt, f)
 
-    with open('./nht.json', 'w') as f:
-        json.dump(nht, f)
+    # with open('./nht.json', 'w') as f:
+    #     json.dump(nht, f)
 
     print ('nh', nh)
     print ('nt', nt)
@@ -128,8 +128,8 @@ def cost_flow_tracklet(assoc_tracklets, nh, nt, nht, data_in, transform):
     trklt_data, type_data = tracklet_matching(assoc_tracklets, nh, nt, nht, data_in)
     graph = MinCostFlowTracker(trklt_data, 0, 0.1, 0.1)
     graph.build_network_tracklet(transform)
-    # optimal_flow, optimal_cost = graph.run(0, max(len(trklt_data["1"]), len(trklt_data["3"]))+1, fib=False)
-    optimal_flow, optimal_cost = graph.run(0, 50, fib=False)
+    optimal_flow, optimal_cost = graph.run(0, max(len(trklt_data["1"]), len(trklt_data["3"]))+1, fib=False)
+    # optimal_flow, optimal_cost = graph.run(0, 50, fib=False)
     # optimal_flow, optimal_cost = graph.run(0, 0, fib=True)
     print("Optimal number of flow: {}".format(optimal_flow))
     print("Optimal cost: {}".format(optimal_cost))

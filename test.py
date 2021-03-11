@@ -36,7 +36,7 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     tracker.build_network(str(len(data)), transform, size)
 
     print ('-> finish building min cost flow graph')
-    optimal_flow, optimal_cost = tracker.run(20, 120, fib=False)
+    optimal_flow, optimal_cost = tracker.run(25, 200, fib=False)
     end = time.time()
 
     print("Finished: {} sec".format(end - start))

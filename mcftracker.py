@@ -95,8 +95,7 @@ class MinCostFlowTracker:
         fdiff = ffCn - lfPn
         
         if fdiff < 0 or fdiff > max_gap:
-            prob_sim = 0.
-            return -math.log(prob_sim+eps)
+            return -1
 
         maxDist = self._return_max_dist(fdiff)
 
@@ -112,8 +111,7 @@ class MinCostFlowTracker:
         dst = distance.euclidean((cx,cy), (rx,ry))
 
         if dst > maxDist:
-            prob_sim = 0.
-            return -math.log(prob_sim+eps)
+            return -1
 
         # normalise dist
         # normalise frame diff
@@ -186,7 +184,8 @@ class MinCostFlowTracker:
                 for i, i_node in enumerate(self._data[prev_type]):
                     for j, j_node in enumerate(node_lst):
                         cost = self._calc_cost_tracklet(i_node, j_node, transform)
-                        self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_type, i, "v")], self._node2id[(ttype, j, "u")], 1, int(cost*1000))
+                        if cost >= 0.:
+                            self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_type, i, "v")], self._node2id[(ttype, j, "u")], 1, int(cost*1000))
 
             else:
                 cur_type = self._id2name[tp]
@@ -194,7 +193,8 @@ class MinCostFlowTracker:
                 for i, i_node in enumerate(self._data[cur_type]):
                     for j, j_node in enumerate(self._data[nex_type]):
                         cost = self._calc_cost_tracklet(i_node, j_node, transform)
-                        self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(cur_type, i, "v")], self._node2id[(nex_type, j, "u")], 1, int(cost*1000))
+                        if cost >= 0.:
+                            self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(cur_type, i, "v")], self._node2id[(nex_type, j, "u")], 1, int(cost*1000))
 
             if tp == 1:
                 # connection betweem nodes in nht (no-head-tail)
@@ -204,7 +204,8 @@ class MinCostFlowTracker:
                 for i in range(len(nlst)-1):
                     for j in range(i+1, len(nlst)):
                         cost = self._calc_cost_tracklet(nlst[i], nlst[j], transform)
-                        self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(tnht, i, "v")], self._node2id[(tnht, j, "u")], 1, int(cost*1000))
+                        if cost >= 0.:
+                            self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(tnht, i, "v")], self._node2id[(tnht, j, "u")], 1, int(cost*1000))
 
         return
 
