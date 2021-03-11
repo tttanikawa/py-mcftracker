@@ -31,8 +31,8 @@ from scipy import interpolate
 
 def isGoalArea(transform, xwc, size=None, frame=None):
 
-    # gp = [[0, 54.16, 0], [16.5, 54.16, 0], [0, 13.84, 0], [16.5, 13.84, 0],
-    #         [105, 54.16, 0], [88.5, 54.16, 0], [105, 13.84, 0], [88.5, 13.84, 0]]
+    gp = [[0, 54.16, 0], [16.5, 54.16, 0], [0, 13.84, 0], [16.5, 13.84, 0],
+            [105, 54.16, 0], [88.5, 54.16, 0], [105, 13.84, 0], [88.5, 13.84, 0]]
 
     # for p in gp:
     #     x,y = transform.ground_to_video(p[0]/105., p[1]/68., 0)
@@ -55,6 +55,7 @@ def isGoalArea(transform, xwc, size=None, frame=None):
 def box2midpoint_normalised(box, iw, ih):
     w = box[2]-box[0]
     x, y = box[0] + w/2, box[3]
+    # print (x,y,iw,ih)
     return (x/iw, y/ih)
 
 def is_box_occluded(tlbr, boxes, t_iou=1.0):
@@ -110,6 +111,7 @@ def convert2world(rows, size, transform):
         cb = [x1,y1,x2,y2,s]
         p = box2midpoint_normalised(cb, size[1], size[0])
         cx, cy = transform.video_to_ground(p[0], p[1])
+        # print (cx,cy)
         wc.append((cx,cy))
     return wc
 
@@ -194,20 +196,24 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
         bbimgs = []
         node_lst = []
  
-        _wc = convert2world(rows, size, transform)
-        wc_d[index] = _wc.copy()
-
+        _wc = []
         for n,r in enumerate(rows):
             _, x1, y1, x2, y2, s = int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])
 
             curbox = [x1,y1,x2,y2]
             imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
             
-            node = GraphNode(_wc[n], curbox, s, 0, copy.deepcopy(imgbox))
+            p = box2midpoint_normalised(curbox, size[1], size[0])
+            cx, cy = transform.video_to_ground(p[0], p[1])
+            _wc.append((cx,cy))
+
+            node = GraphNode((cx,cy), curbox, s, 0, copy.deepcopy(imgbox))
 
             bbimgs.append(imgbox)
             node_lst.append(node)
-            
+        
+        wc_d[index] = _wc.copy()
+
         if len(bbimgs) == 0:
             print ('no images')
             continue
@@ -429,7 +435,7 @@ def build_hypothesis_lst(flow_dict, source_idx, sink_idx):
     print ('# tracklets not starting at first frame: %d' % (len(nh)))
     print ('# tracklets not starting at first and not ending at last frame: %d' %(len(nht)))
     print ('# tracklets complete: %d' % (len(ht)))
-    print ('# tracklets: %d' % len(track_hypot))
+    # print ('# tracklets: %d' % len(track_hypot))
 
     return track_hypot, nt, nh, nht
 

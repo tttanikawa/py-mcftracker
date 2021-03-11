@@ -93,20 +93,20 @@ def hypot2id(hypot, ttype, all_tracklets, data_in, transform):
     
     return matches
 
-# def cost_flow_tracklet(assoc_tracklets, nh, nt, nht, data_in, transform):
-def cost_flow_tracklet(data_in, transform):
+def cost_flow_tracklet(assoc_tracklets, nh, nt, nht, data_in, transform):
+# def cost_flow_tracklet(data_in, transform):
 
-    with open('./tracklets.json') as f:
-        assoc_tracklets = json.load(f)
+    # with open('./tracklets.json') as f:
+    #     assoc_tracklets = json.load(f)
 
-    with open('./nh.json') as f:
-        nh = json.load(f)
+    # with open('./nh.json') as f:
+    #     nh = json.load(f)
 
-    with open('./nt.json') as f:
-        nt = json.load(f)
+    # with open('./nt.json') as f:
+    #     nt = json.load(f)
 
-    with open('./nht.json') as f:
-        nht = json.load(f)
+    # with open('./nht.json') as f:
+    #     nht = json.load(f)
 
     # with open('./tracklets.json', 'w') as f:
     #     json.dump(assoc_tracklets, f)
@@ -127,7 +127,7 @@ def cost_flow_tracklet(data_in, transform):
     # return assoc_tracklets
 
     trklt_data, type_data = tracklet_matching(assoc_tracklets, nh, nt, nht, data_in)
-    graph = MinCostFlowTracker(trklt_data, 0, 0.3, 0.1)
+    graph = MinCostFlowTracker(trklt_data, 0, 0.5, 0.1)
     graph.build_network_tracklet(transform)
     optimal_flow, optimal_cost = graph.run(0, max(len(trklt_data["1"]), len(trklt_data["3"]))+1, fib=False)
     # optimal_flow, optimal_cost = graph.run(0, 0, fib=True)
