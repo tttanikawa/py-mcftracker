@@ -97,12 +97,12 @@ def visualise_hypothesis_with_detections(path2video, data, slice_start, slice_en
 
     vout.release()
 
-def visualise_tracks(path2video, slice_start, slice_end, _wc, transform, size):
-    hypothesis = np.loadtxt("./hypothesis.txt", delimiter=',')
+def visualise_tracks(filename, path2video, slice_start, slice_end, _wc, transform, size, video_name):
+    hypothesis = np.loadtxt(filename, delimiter=',')
     frame_indices = hypothesis[:, 0].astype(np.int)
     
     out_size = (1800, 450)
-    vout = cv2.VideoWriter('./out.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 25, out_size)
+    vout = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc('M','J','P','G'), 25, out_size)
 
     video = mmcv.VideoReader(path2video)
 

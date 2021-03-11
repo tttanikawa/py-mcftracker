@@ -30,24 +30,30 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     # return
 
     start = time.time()
-    tracker = MinCostFlowTracker(data, 0, 0.3, 0.1)
+    tracker = MinCostFlowTracker(data, 0, 0.1, 0.1)
 
     print ('-> start building min cost flow graph')
     tracker.build_network(str(len(data)), transform, size)
 
     print ('-> finish building min cost flow graph')
-    optimal_flow, optimal_cost = tracker.run(20, 100, fib=False)
+    optimal_flow, optimal_cost = tracker.run(20, 120, fib=False)
     end = time.time()
 
     print("Finished: {} sec".format(end - start))
     print("Optimal number of flow: {}".format(optimal_flow))
     print("Optimal cost: {}".format(optimal_cost))
 
+    out_file = './hypothesis_pre.txt'
+    out_video = './out_pre.avi'
     track_hypot, nt, nh, nht = helper.build_hypothesis_lst(tracker.flow_dict, "1", lf_i)
-    # tracks = tracklet_matching.cost_flow_tracklet(track_hypot, nh, nt, nht, data, transform)
-    # helper.write_output_data(tracks, path2det, data, len(data)+1, frame_offset, iid, parity)
-    helper.write_output_data(track_hypot, path2det, data, len(data)+1, frame_offset, iid, parity)
-    debug.visualise_tracks(path2video, slice_start, slice_end, _wc, transform, size)
+    helper.write_output_data(out_file, track_hypot, path2det, data, len(data)+1, frame_offset, iid, parity)
+    debug.visualise_tracks(out_file, path2video, slice_start, slice_end, _wc, transform, size, out_video)
+
+    out_file = './hypothesis.txt'
+    out_video = './out.avi'
+    tracks = tracklet_matching.cost_flow_tracklet(track_hypot, nh, nt, nht, data, transform)
+    helper.write_output_data(out_file, tracks, path2det, data, len(data)+1, frame_offset, iid, parity)
+    debug.visualise_tracks(out_file, path2video, slice_start, slice_end, _wc, transform, size, out_video)
 
 if __name__ == "__main__":
     path2video = sys.argv[1]

@@ -228,9 +228,9 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
     return input_data, transform, size, parity, wc_d, last_frame
 
-def write_output_data(track_hypot, path2det, data, iend, frame_offset, iid, parity):
+def write_output_data(log_filename, track_hypot, path2det, data, iend, frame_offset, iid, parity):
     # write to file
-    log_filename = './hypothesis.txt'
+    # log_filename = './hypothesis.txt'
     log_file = open(log_filename, 'w')
 
     f = 1
