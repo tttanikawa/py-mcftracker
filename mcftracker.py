@@ -80,7 +80,7 @@ class MinCostFlowTracker:
         else:
             return 10000
     
-    def _calc_cost_tracklet(self, prev_node, cur_node, transform, max_gap=60, a=0.10, eps=1e-7):
+    def _calc_cost_tracklet(self, prev_node, cur_node, transform, max_gap=95, a=0.10, eps=1e-7):
         # last frame index of prev_node
         # first frame index of cur_node
         lfPn = prev_node._efIdx
@@ -132,7 +132,7 @@ class MinCostFlowTracker:
         prob_color = cosine_similarity([u],[v])[0][0]
         prob_iou = tools.calc_overlap(bbp, bbc, False)
 
-        if prob_iou == 0.:
+        if prob_iou <= 0.:
             return -1
 
         alpha  = 0.5
