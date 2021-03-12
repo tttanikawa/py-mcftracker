@@ -97,8 +97,40 @@ def visualise_hypothesis_with_detections(path2video, data, slice_start, slice_en
 
     vout.release()
 
-def visualise_hypothesis(path2video, path2det, frame_offset, frame_count):
+def visualise_tracks(filename, path2video, slice_start, slice_end, _wc, transform, size, video_name):
+    hypothesis = np.loadtxt(filename, delimiter=',')
+    frame_indices = hypothesis[:, 0].astype(np.int)
+    
+    out_size = (1800, 450)
+    vout = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc('M','J','P','G'), 25, out_size)
 
+    video = mmcv.VideoReader(path2video)
+
+    for frame_idx in range(slice_start, slice_end):
+        frame = video[frame_idx]
+        
+        if (frame_idx+1) % 500 == 0:
+            print("Frame %05d/%05d" % (frame_idx+1, slice_end))
+
+        mask_h = frame_indices == (frame_idx - slice_start + 1)
+        rows = hypothesis[mask_h]
+
+        cv2.putText(frame, str(frame_idx-slice_start+1), (150, 200), cv2.FONT_HERSHEY_PLAIN, 4, (0,0,255), 4)
+
+        for r in rows:	
+            tid, x1, y1, w, h, s = int(r[1]), int(r[2]), int(r[3]), int(r[4]), int(r[5]), int(r[9])
+            cv2.putText(frame, str(tid), (x1, y1), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,255), 2)
+        
+        if frame_idx in _wc:
+            for c in _wc[frame_idx]:
+                vx, vy = transform.ground_to_video(c[0], c[1])
+                cv2.circle(frame, (int(vx * size[1]), int(vy * size[0])), 2, (255,0,0), 5)
+
+        vout.write(cv2.resize(frame, out_size))
+
+    vout.release()
+
+def visualise_hypothesis(path2video, path2det, frame_offset, frame_count):
     hypothesis = np.loadtxt("./hypothesis.txt", delimiter=',')
     detections = np.loadtxt(path2det, delimiter=',')
 

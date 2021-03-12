@@ -4,12 +4,11 @@ import numpy as np
 import mmcv
 
 import sys
-sys.path.append('/root/py-mcftracker/player-feature-extractor')
 sys.path.append('/root/bepro-python')
 
 import torch
-from torchreid.utils import FeatureExtractor
-from scripts.extract_fetures import network_feed_from_list
+from pfe.torchreid.utils import FeatureExtractor
+from pfe.scripts.extract_fetures import network_feed_from_list
 
 from bepy.transform import Transform
 from bepy.models import MatchVideo
@@ -30,8 +29,8 @@ from scipy import interpolate
 
 def isGoalArea(transform, xwc, size=None, frame=None):
 
-    # gp = [[0, 54.16, 0], [16.5, 54.16, 0], [0, 13.84, 0], [16.5, 13.84, 0],
-    #         [105, 54.16, 0], [88.5, 54.16, 0], [105, 13.84, 0], [88.5, 13.84, 0]]
+    gp = [[0, 54.16, 0], [16.5, 54.16, 0], [0, 13.84, 0], [16.5, 13.84, 0],
+            [105, 54.16, 0], [88.5, 54.16, 0], [105, 13.84, 0], [88.5, 13.84, 0]]
 
     # for p in gp:
     #     x,y = transform.ground_to_video(p[0]/105., p[1]/68., 0)
@@ -54,6 +53,7 @@ def isGoalArea(transform, xwc, size=None, frame=None):
 def box2midpoint_normalised(box, iw, ih):
     w = box[2]-box[0]
     x, y = box[0] + w/2, box[3]
+    # print (x,y,iw,ih)
     return (x/iw, y/ih)
 
 def is_box_occluded(tlbr, boxes, t_iou=1.0):
@@ -80,7 +80,6 @@ def is_patch_complex_scene(index, wc, transform, tdist=5.0, tcrowd=5):
             continue
 
         rx, ry = b[0], b[1]
-
         dist = calc_eucl_dist([cx*transform.parameter.get("ground_width"),cy*transform.parameter.get("ground_height")], 
                             [rx*transform.parameter.get("ground_width"),ry*transform.parameter.get("ground_height")])
 
@@ -108,6 +107,17 @@ def convert2world(rows, size, transform):
     for n,r in enumerate(rows):
         _, x1, y1, x2, y2, s = int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])
         cb = [x1,y1,x2,y2,s]
+        p = box2midpoint_normalised(cb, size[1], size[0])
+        cx, cy = transform.video_to_ground(p[0], p[1])
+        # print (cx,cy)
+        wc.append((cx,cy))
+    return wc
+
+def convert2world_post(rows, size, transform):
+    wc = []
+    for n,r in enumerate(rows):
+        _, x1, y1, w, h, _ = int(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5]), int(r[9])
+        cb = [x1,y1,x1+w,y1+h]
         p = box2midpoint_normalised(cb, size[1], size[0])
         cx, cy = transform.video_to_ground(p[0], p[1])
         wc.append((cx,cy))
@@ -145,7 +155,10 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
         parity = True
     elif slice_start %2 == 0 and (slice_end-1) % 2 == 0: # even - even
         parity = True
-        
+    
+    last_frame = ""
+
+    wc_d = {}
     for index in range(slice_start, slice_end):
         frame = video[index]
 
@@ -172,42 +185,32 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             print ('-> reading frame %d / %d' % (fnum, slice_end-slice_start))
 
         mask = frame_indices == (index - slice_start + 1)
-        # mask = frame_indices == fnum
         rows = det_in[mask]
 
         image_name = "%d" % (fnum)
+        last_frame = image_name
 
         bbimgs = []
         node_lst = []
  
-        _wc = convert2world(rows, size, transform)
-
+        _wc = []
         for n,r in enumerate(rows):
             _, x1, y1, x2, y2, s = int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])
 
             curbox = [x1,y1,x2,y2]
             imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
             
-            node = GraphNode(_wc[n], curbox, s, 0)
+            p = box2midpoint_normalised(curbox, size[1], size[0])
+            cx, cy = transform.video_to_ground(p[0], p[1])
+            _wc.append((cx,cy))
 
-            if is_box_occluded(node._bb, rows, t_iou=0.10):
-                if is_patch_complex_scene(n, _wc, transform, tdist=5.0):
-                    if isGoalArea(transform, node._3dc, size, frame):
-                        if is_patch_complex_scene(n, _wc, transform, tdist=3.0):
-                            node._status = 4
-                        else:
-                            node._status = 2
-                    else:
-                        if is_patch_complex_scene(n, _wc, transform, tdist=2.0):
-                            node._status = 3
-                        else:
-                            node._status = 2
-                else:
-                        node._status = 1
+            node = GraphNode((cx,cy), curbox, s, 0, copy.deepcopy(imgbox))
 
             bbimgs.append(imgbox)
             node_lst.append(node)
-            
+        
+        wc_d[index] = _wc.copy()
+
         if len(bbimgs) == 0:
             print ('no images')
             continue
@@ -220,11 +223,11 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
     print ('-> %d images have been read & processed' % (len(input_data)))
 
-    return input_data, transform, size, parity
+    return input_data, transform, size, parity, wc_d, last_frame
 
-def write_output_data(track_hypot, path2det, data, iend, frame_offset, iid, parity):
+def write_output_data(log_filename, track_hypot, path2det, data, iend, frame_offset, iid, parity):
     # write to file
-    log_filename = './hypothesis.txt'
+    # log_filename = './hypothesis.txt'
     log_file = open(log_filename, 'w')
 
     f = 1
@@ -246,8 +249,6 @@ def write_output_data(track_hypot, path2det, data, iend, frame_offset, iid, pari
 
         all_lines.append(lines)
         f = f+2
-
-    print (len(all_lines))
 
     if not parity:
         for i in range(len(all_lines)-1):
@@ -329,148 +330,81 @@ def calc_eucl_dist(det1, det2):
     dist = np.linalg.norm(pt1_np-pt2_np)
     return dist
 
-def return_max_dist(x):
-    return math.log(x) + 2.8
+# def return_max_dist(x):
+#     if x == 1:
+#         return 1.2
+#     return 4*math.log10(x)
 
-def compute_cost(u, v, cur_box, ref_box, transform, size, frame_gap, alpha=0.6, inf=1e6):
+# def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size, inf=1e6, max_gap=80):
+#     cost_mtx = np.zeros((len(hypothesis_t), len(hypothesis_s)))
 
-    if frame_gap < 1:
-        return inf
-        
-    cos_dist = distance.cosine(u, v)
+#     for i, index_i in enumerate(hypothesis_t):
+#         for j, index_j in enumerate(hypothesis_s):
+#             last_idx = hypothesis[index_i][-1] # tuple ('frame_num', detection_index, 'u')
+#             first_idx = hypothesis[index_j][0]
 
-    # test: project points (0,0,0), (1.0,0,0), (0,1.0,0), (1.0,1.0,0) to image
-    # frame = cv2.imread("frame.jpg")
-    # ground_points = [[0.,0.,0.], [1.,0.,0.], [0.,1.,0.], [1.,1.,0.]]
-    # for point in ground_points:        
-    #     x, y = transform.ground_to_video(point[0], point[1])
-    #     x = x * frame.shape[1]
-    #     y = y * frame.shape[0]
-    #     cv2.circle(frame, (int(x), int(y)), 5, (0,0,255), 5)
-    #cv2.imwrite("frame.jpg", frame)
-
-    p1 = box2midpoint_normalised(cur_box, size[1], size[0])
-    p2 = box2midpoint_normalised(ref_box, size[1], size[0])
-
-    cx, cy = transform.video_to_ground(p1[0], p1[1])
-    rx, ry = transform.video_to_ground(p2[0], p2[1])
-
-    # print (transform.parameter.get("ground_width"), transform.parameter.get("ground_height"))
-
-    dist = calc_eucl_dist([cx*transform.parameter.get("ground_width"),cy*transform.parameter.get("ground_height")], 
-                        [rx*transform.parameter.get("ground_width"),ry*transform.parameter.get("ground_height")])
-
-    maxdistance = return_max_dist(frame_gap)
-
-    if dist > maxdistance: 
-        return inf
-
-    dist_norm = dist / maxdistance
-    cost = alpha*dist_norm + (1-alpha)*cos_dist
-
-    return cost
-
-def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size, inf=1e6, max_gap=60):
-    cost_mtx = np.zeros((len(hypothesis_t), len(hypothesis_s)))
-
-    for i, index_i in enumerate(hypothesis_t):
-        for j, index_j in enumerate(hypothesis_s):
-            last_idx = hypothesis[index_i][-1] # tuple ('frame_num', detection_index, 'u')
-            first_idx = hypothesis[index_j][0]
-
-            gap = int(first_idx[0]) - int(last_idx[0])
+#             # gap = int(first_idx[0]) - int(last_idx[0])s
+#             gap = int(first_idx[0]) - int(last_idx[0]) + 1
             
-            feat_tail = data[last_idx[0]][last_idx[1]]._feat
-            feat_head = data[first_idx[0]][first_idx[1]]._feat
+#             feat_tail = data[last_idx[0]][last_idx[1]]._feat
+#             feat_head = data[first_idx[0]][first_idx[1]]._feat
 
-            det_tail = data[last_idx[0]][last_idx[1]]._bb
-            det_head = data[first_idx[0]][first_idx[1]]._bb
+#             det_tail = data[last_idx[0]][last_idx[1]]._bb
+#             det_head = data[first_idx[0]][first_idx[1]]._bb
 
-            cost_mtx[i][j] = compute_cost(feat_tail, feat_head, det_tail, det_head, transform, size, gap)
-            
-            if data[last_idx[0]][last_idx[1]]._status == 3 or data[last_idx[0]][last_idx[1]]._status == 4:
-                cost_mtx[i][j] = inf
+#             cost_mtx[i][j] = compute_cost(feat_tail, feat_head, det_tail, det_head, transform, size, gap)
 
-            # check if gap isn't too large
-            if gap >= max_gap:
-                cost_mtx[i][j] = inf
+#             # check if gap isn't too large
+#             if gap >= max_gap:
+#                 cost_mtx[i][j] = inf
 
-    return cost_mtx
+#     return cost_mtx
 
-def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, data, transform, size):
-    cost = cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size)
+# def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, data, transform, size):
+#     print (hypothesis[0])
+#     print (len(hypothesis))
+#     print ('temporal hungarian assignment')
+#     print (hypothesis_t)
+#     print ('---------')
+#     print (hypothesis_s)
+
+#     cost = cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size)
     
-    # assignment
-    row_ind, col_ind = linear_sum_assignment(cost)
-    print ('temporal hungarian assignment')
+#     # assignment
+#     row_ind, col_ind = linear_sum_assignment(cost)
 
-    matches = []
-    for r,c in zip(row_ind, col_ind):
-        if cost[r][c] != 1e6:
-            print ('id %d -> id %d - frames: [%d-%d] cost: %f' % (hypothesis_t[r]+1, hypothesis_s[c]+1, 
-                        2*int(hypothesis[hypothesis_t[r]][-1][0]), 2*int(hypothesis[hypothesis_s[c]][0][0]), cost[r][c]))
-            matches.append((hypothesis_t[r], hypothesis_s[c]))
+#     matches = []
+#     for r,c in zip(row_ind, col_ind):
+#         if cost[r][c] != 1e6:
+#             print ('id %d -> id %d - frames: [%d-%d] cost: %f' % (hypothesis_t[r]+1, hypothesis_s[c]+1, 
+#                         2*int(hypothesis[hypothesis_t[r]][-1][0]), 2*int(hypothesis[hypothesis_s[c]][0][0]), cost[r][c]))
+#             matches.append((hypothesis_t[r], hypothesis_s[c]))
 
-    # sort matches in descending order of hypothesis_s
-    matches.sort(key=lambda tup: tup[1], reverse=True)
-    print ('matches after sorting ==>')
-    print (matches)
-    
-    # for s,e in matches:
-    #     ns = hypothesis[s][-1] # tuple ('frame_num', detection_index, 'u')
-    #     ne = hypothesis[e][0]
+#     # sort matches in descending order of hypothesis_s
+#     matches.sort(key=lambda tup: tup[1], reverse=True)
+#     # print ('matches after sorting ==>')
+#     # print (matches)
 
-    #     fs = int(ns[0])
-    #     fe = int(ne[0])
-  
-    #     bs = data[ns[0]][ns[1]]._bb
-    #     be = data[ne[0]][ne[1]]._bb
+#     # # combining two tracks	
+#     for s,e in matches:
+#         for node in hypothesis[e]:
+#             hypothesis[s].append(node)
 
-    #     # print ('%d -> %d > %s -> %s' % (fs,fe,bs,be))
+#     # # deleting old track
+#     for _,e in matches:
+#         hypothesis[e].clear()
 
-    #     fpx1 = [bs[0], be[0]]
-    #     fpy1 = [bs[1], be[1]]
-    #     fpx2 = [bs[2], be[2]]
-    #     fpy2 = [bs[3], be[3]]
-
-    #     xp = [fs, fe]
-
-    #     for x in range(fs+1, fe):
-    #         pix1 = np.interp(x, xp, fpx1)
-    #         piy1 = np.interp(x, xp, fpy1)
-    #         pix2 = np.interp(x, xp, fpx2)
-    #         piy2 = np.interp(x, xp, fpy2)
-
-    #         # print ('%d -> %s' % (x, [pix1,piy1,pix2,piy2]))
-    #         pi = [pix1,piy1,pix2,piy2]
-
-    #         gn = GraphNode([0.,0.], pi, 0., 0)
-    #         fn = str(x)
-
-    #         index = len(data[fn])
-    #         data[fn].append(gn)
-
-    #         node_u = (fn, index, "u")
-    #         node_v = (fn, index, "v")
-
-    #         hypothesis[s].append(node_u)
-    #         hypothesis[s].append(node_v)
-
-    # # combining two tracks	
-    for s,e in matches:
-        for node in hypothesis[e]:
-            hypothesis[s].append(node)
-
-    # # deleting old track
-    for _,e in matches:
-        hypothesis[e].clear()
-
-    return
+#     return
 
 def build_hypothesis_lst(flow_dict, source_idx, sink_idx):
-    tr_end = []
-    tr_bgn = []
     track_hypot = []
+
+    nh = [] # no head
+    nt = [] # no tail
+    nht = [] # no head no tail
+    ht = []
+
+    print ('source frame %s sink frame %s' % (source_idx, sink_idx))
 
     for n, (k, _) in enumerate(flow_dict["source"].items()):
         tr_lst = loop_get_track(k, flow_dict)
@@ -479,11 +413,116 @@ def build_hypothesis_lst(flow_dict, source_idx, sink_idx):
         s_node = tr_lst[0]
         t_node = tr_lst[-1]
 
-        if s_node[0] != source_idx:
-            tr_bgn.append(n)
+        if s_node[0] != source_idx and t_node[0] == sink_idx:
+            nh.append(n)
+        elif s_node[0] == source_idx and t_node[0] != sink_idx:
+            nt.append(n)
+        elif s_node[0] != source_idx and t_node[0] != sink_idx:
+            nht.append(n)
+        elif s_node[0] == source_idx and t_node[0] == sink_idx:
+            ht.append(n)
+            
+        # if s_node[0] != source_idx:
+        #     tr_bgn.append(n)
 
-        if t_node[0] != sink_idx:
-            tr_end.append(n)
+        # if t_node[0] != sink_idx:
+        #     tr_end.append(n)
+    
+    print ('# tracklets not ending at last frame: %d' % (len(nt)))
+    print ('# tracklets not starting at first frame: %d' % (len(nh)))
+    print ('# tracklets not starting at first and not ending at last frame: %d' %(len(nht)))
+    print ('# tracklets complete: %d' % (len(ht)))
+    # print ('# tracklets: %d' % len(track_hypot))
 
-    return track_hypot, tr_bgn, tr_end
+    return track_hypot, nt, nh, nht
 
+def remove_compex_scene_id(path2hypothesis, transform, size):
+    hypothesis = np.loadtxt("./hypothesis_.txt", delimiter=',')
+    frame_indices = hypothesis[:, 0].astype(np.int)
+
+    min_frame_idx = frame_indices.astype(np.int).min()
+    max_frame_idx = frame_indices.astype(np.int).max()
+
+    log_filename = './hypothesis.txt'
+    log_file = open(log_filename, 'w')
+
+    print ("==> removing complex scene ids")
+    count = 0
+
+    for frame_idx in range(min_frame_idx, max_frame_idx):
+        rows = hypothesis[frame_indices == frame_idx]
+        
+        _wc = convert2world_post(rows, size, transform)
+
+        for n,r in enumerate(rows):
+            if is_patch_complex_scene(n, _wc, transform, tdist=3.5, tcrowd=6):
+                count = count + 1
+                continue
+
+            tid, x1, y1, w, h, s = int(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5]), int(r[9])
+            # write new result
+            log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (frame_idx, tid, x1, y1, w, h, s))
+
+def remove_compex_scene_id_grid(path2hypothesis, transform, size):
+    v_t = 20
+    h_t = 30
+
+    gw = float(transform.parameter.get("ground_width"))
+    gh = float(transform.parameter.get("ground_height"))
+
+    x_w = gw / h_t
+    y_w = gh / v_t
+
+    x_range = [x * x_w for x in range(0, h_t)]
+    y_range = [y * y_w for y in range(0, v_t)]
+
+    grid = {}
+    for i,y in enumerate(y_range):
+        ty = [y, y+y_w]
+        for j,x in enumerate(x_range):
+            tx = [x, x+x_w]
+            pos = (i,j)
+            grid[pos] = [ty,tx]
+
+    hypothesis = np.loadtxt("./hypothesis_.txt", delimiter=',')
+    frame_indices = hypothesis[:, 0].astype(np.int)
+
+    min_frame_idx = frame_indices.astype(np.int).min()
+    max_frame_idx = frame_indices.astype(np.int).max()
+
+    log_filename = './hypothesis.txt'
+    log_file = open(log_filename, 'w')
+
+    print ("==> removing complex scene ids")
+    b2t = {}
+
+    for frame_idx in range(min_frame_idx, max_frame_idx+1):
+        rows = hypothesis[frame_indices == frame_idx]
+        _wc = convert2world_post(rows, size, transform)
+        
+        for item in grid.items():
+            # item[0] -> (i,j)
+            # item[1] -> [[y1 y2],[x1 x2]]
+            pos = item[0]
+            yran = item[1][0] # [y1 y2]
+            xran = item[1][1] # [x1 x2]
+
+            b2t[pos] = []
+
+            for n,p in enumerate(_wc):
+                # p is normalised
+                xp = min(p[0]*transform.parameter.get("ground_width"), float(transform.parameter.get("ground_width")))
+                yp = min(p[1]*transform.parameter.get("ground_height"), float(transform.parameter.get("ground_height")))
+
+                if yp >= yran[0] and yp < yran[1] and xp >= xran[0] and xp < xran[1]:
+                    b2t[pos].append(n)
+
+        for item in b2t.items():
+            # item[0] -> (i,j) grid pos
+            # item[1] -> [] lst of indices in row
+            if len(item[1]) < 4:
+                for i in item[1]:
+                    r = rows[i]
+                    tid, x1, y1, w, h, s = int(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5]), int(r[9])
+                    # write new result
+                    log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (frame_idx, tid, x1, y1, w, h, s))
