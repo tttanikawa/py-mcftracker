@@ -90,7 +90,7 @@ def visualise_hypothesis_with_detections(path2video, data, slice_start, slice_en
         for node in node_lst:
             d = node._bb
             x1, y1, x2, y2 = int(d[0]), int(d[1]), int(d[2]), int(d[3])
-            cv2.circle(frame, (x1+int((x2-x1)/2), y1+int((y2-y1)/2)), 2, (255,0,0), 5)
+            cv2.circle(frame, (x1+int((x2-x1)/2), y1+int((y2-y1)/2)), 2, (0,0,255), 5)
 
         cv2.putText(frame, '# dets ' + str(len(node_lst)), (150, 400), cv2.FONT_HERSHEY_PLAIN, 4, (0,255,0), 4)
         vout.write(cv2.resize(frame, out_size))

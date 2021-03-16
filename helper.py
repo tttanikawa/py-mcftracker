@@ -4,7 +4,8 @@ import numpy as np
 import mmcv
 
 import sys
-sys.path.append('/root/bepro-python')
+# sys.path.append('/root/bepro-python')
+sys.path.append('/home/bepro/bepro-python')
 
 import torch
 from pfe.torchreid.utils import FeatureExtractor
@@ -124,7 +125,8 @@ def convert2world_post(rows, size, transform):
     return wc
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
-                        ckpt_path='/root/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
+                        # ckpt_path='/root/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
+                        ckpt_path='/home/bepro/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
     
     input_data = {}
     video = mmcv.VideoReader(path2video)
@@ -200,9 +202,9 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             curbox = [x1,y1,x2,y2]
             imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
             
-            # p = box2midpoint_normalised(curbox, size[1], size[0])
-            # cx, cy = transform.video_to_ground(p[0], p[1])
-            cx, cy = transform.video_to_ground(x1/size[1], y1/size[0])
+            p = box2midpoint_normalised(curbox, size[1], size[0])
+            cx, cy = transform.video_to_ground(p[0], p[1])
+            # cx, cy = transform.video_to_ground(x1/size[1], y1/size[0])
             _wc.append((cx,cy))
 
             node = GraphNode((cx,cy), curbox, s, 0, copy.deepcopy(imgbox))

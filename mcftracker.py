@@ -11,6 +11,7 @@ from ortools.graph import pywrapgraph
 import sys
 import cv2
 import tools
+import numpy as np
 
 from sklearn.metrics.pairwise import cosine_similarity
 import helper
@@ -80,7 +81,7 @@ class MinCostFlowTracker:
         else:
             return 10000
     
-    def _calc_cost_tracklet(self, prev_node, cur_node, transform, max_gap=95, a=0.10, eps=1e-7):
+    def _calc_cost_tracklet(self, prev_node, cur_node, transform, max_gap=95, a=0.10):
         # last frame index of prev_node
         # first frame index of cur_node
         lfPn = prev_node._efIdx
@@ -94,7 +95,7 @@ class MinCostFlowTracker:
         # difference in frame index
         fdiff = ffCn - lfPn
         
-        if fdiff < 0 or fdiff > max_gap:
+        if fdiff < 0 or fdiff >= max_gap:
             return -1
 
         maxDist = self._return_max_dist(fdiff)
@@ -110,7 +111,7 @@ class MinCostFlowTracker:
 
         dst = distance.euclidean((cx,cy), (rx,ry))
 
-        if dst > maxDist:
+        if dst >= maxDist:
             return -1
 
         # normalise dist
@@ -118,27 +119,34 @@ class MinCostFlowTracker:
         dist_n = dst / maxDist
         fdiff_n = fdiff / max_gap
 
-        prob = a*(1.0-dist_n) + (1-a)*(1.0-fdiff_n)
+        # prob = a*(1.0-dist_n) + (1-a)*(1.0-fdiff_n)
+        prob = 1.0-dist_n
 
-        return -math.log(prob+eps)
+        return -math.log(prob)
     
-    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=3.0, eps=1e-6):
+    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.5, a=1):
         u = prev_node._feat
         v = cur_node._feat
 
-        bbp = prev_node._bb
-        bbc = cur_node._bb
+        pxy = (prev_node._3dc[0]*transform.parameter.get("ground_width"), prev_node._3dc[1]*transform.parameter.get("ground_height"))
+        cxy = (cur_node._3dc[0]*transform.parameter.get("ground_width"), cur_node._3dc[1]*transform.parameter.get("ground_height"))
+        a = np.array(pxy)
+        b = np.array(cxy)
 
         prob_color = cosine_similarity([u],[v])[0][0]
-        prob_iou = tools.calc_overlap(bbp, bbc, False)
-
-        if prob_iou <= 0.:
+        
+        if prob_color <= 0.80:
             return -1
 
-        alpha  = 0.
-        prob_sim = alpha*prob_iou + (1.0-alpha)*prob_color
+        dst_eucl = np.linalg.norm(a-b)
 
-        return -math.log(prob_sim+eps)
+        if dst_eucl >= dst_max:
+            return -1
+
+        prob_dst = 1.0 - dst_eucl / dst_max
+        prob_sim = prob_dst
+
+        return -math.log(prob_sim)
 
     def build_network(self, last_img_name, transform, size, f2i_factor=10000):
         self.mcf = pywrapgraph.SimpleMinCostFlow()
