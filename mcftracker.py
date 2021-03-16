@@ -135,7 +135,7 @@ class MinCostFlowTracker:
         if prob_iou <= 0.:
             return -1
 
-        alpha  = 0.5
+        alpha  = 0.
         prob_sim = alpha*prob_iou + (1.0-alpha)*prob_color
 
         return -math.log(prob_sim+eps)
