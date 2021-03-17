@@ -48,10 +48,12 @@ class MinCostFlowTracker:
         return n
 
     def _return_max_dist(self,x):
-        if x == 0:
-            return 1.0
-        if x == 1:
-            return 1.2
+        # if x == 0:
+        #     return 1.0
+        # if x == 1:
+        #     return 1.2
+        if x < 10:
+            return 4.0
         return 4*math.log10(x)
 
     def _find_nearest_fib(self, num):
@@ -81,7 +83,7 @@ class MinCostFlowTracker:
         else:
             return 10000
     
-    def _calc_cost_tracklet(self, prev_node, cur_node, transform, max_gap=95, a=0.10):
+    def _calc_cost_tracklet(self, prev_node, cur_node, transform, max_gap=95, c=0.40):
         # last frame index of prev_node
         # first frame index of cur_node
         lfPn = prev_node._efIdx
@@ -119,12 +121,11 @@ class MinCostFlowTracker:
         dist_n = dst / maxDist
         fdiff_n = fdiff / max_gap
 
-        # prob = a*(1.0-dist_n) + (1-a)*(1.0-fdiff_n)
-        prob = 1.0-dist_n
+        prob = c*(1.0-dist_n) + (1.0-c)*(1.0-fdiff_n)
 
         return -math.log(prob)
     
-    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.5, a=1):
+    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.5, c=0.6):
         u = prev_node._feat
         v = cur_node._feat
 
@@ -133,9 +134,9 @@ class MinCostFlowTracker:
         a = np.array(pxy)
         b = np.array(cxy)
 
-        prob_color = cosine_similarity([u],[v])[0][0]
+        prob_color = np.float32(cosine_similarity([u],[v])[0][0])
         
-        if prob_color <= 0.80:
+        if prob_color <= 0.85:
             return -1
 
         dst_eucl = np.linalg.norm(a-b)
@@ -143,8 +144,8 @@ class MinCostFlowTracker:
         if dst_eucl >= dst_max:
             return -1
 
-        prob_dst = 1.0 - dst_eucl / dst_max
-        prob_sim = prob_dst
+        prob_dst = np.float32(1.0 - dst_eucl / dst_max)
+        prob_sim = c*prob_dst + (1.0-c)*prob_color
 
         return -math.log(prob_sim)
 
@@ -179,7 +180,6 @@ class MinCostFlowTracker:
         self.mcf = pywrapgraph.SimpleMinCostFlow()
 
         for ttype, node_lst in sorted(self._data.items(), key=lambda t: tools.get_key(t[0])):
-
             tp = self._name2id[ttype]
 
             for i, _ in enumerate(node_lst):
@@ -292,8 +292,9 @@ class MinCostFlowTracker:
             if self.mcf.Solve() == self.mcf.OPTIMAL:
                 cost = self.mcf.OptimalCost()
             else:
-                print("There was an issue with the min cost flow input.")
-                sys.exit()
+                continue
+                # print("There was an issue with the min cost flow input.")
+                # sys.exit()
 
             if cost < optimal_cost:
                 optimal_flow = flow

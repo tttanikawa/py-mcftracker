@@ -38,16 +38,19 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     print("Optimal number of flow: {}".format(optimal_flow))
     print("Optimal cost: {}".format(optimal_cost))
 
-    out_file = './hypothesis_pre.txt'
-    out_video = './out_pre.avi'
+    # out_file = './hypothesis_pre.txt'
+    # out_video = './out_pre.avi'
     track_hypot, nt, nh, nht = helper.build_hypothesis_lst(tracker.flow_dict, "1", lf_i)
-    helper.write_output_data(out_file, track_hypot, path2det, data, len(data)+1, frame_offset, iid, parity)
-    debug.visualise_tracks(out_file, path2video, slice_start, slice_end, _wc, transform, size, out_video)
+    # helper.write_output_data(out_file, track_hypot, path2det, data, len(data)+1, frame_offset, iid, parity)
+    # debug.visualise_tracks(out_file, path2video, slice_start, slice_end, _wc, transform, size, out_video)
 
+    out_file_pre = './hypothesis_pre.txt'
     out_file = './hypothesis.txt'
     out_video = './out.avi'
+    
     tracks = tracklet_matching.cost_flow_tracklet(track_hypot, nh, nt, nht, data, transform)
-    helper.write_output_data(out_file, tracks, path2det, data, len(data)+1, frame_offset, iid, parity)
+    helper.write_output_data(out_file_pre, tracks, path2det, data, len(data)+1, frame_offset, iid, parity)
+    helper.remove_compex_scene_id_grid(out_file_pre, out_file, transform, size)
     debug.visualise_tracks(out_file, path2video, slice_start, slice_end, _wc, transform, size, out_video)
 
 if __name__ == "__main__":

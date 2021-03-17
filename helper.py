@@ -4,8 +4,7 @@ import numpy as np
 import mmcv
 
 import sys
-# sys.path.append('/root/bepro-python')
-sys.path.append('/home/bepro/bepro-python')
+sys.path.append('/root/bepro-python')
 
 import torch
 from pfe.torchreid.utils import FeatureExtractor
@@ -125,8 +124,7 @@ def convert2world_post(rows, size, transform):
     return wc
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
-                        # ckpt_path='/root/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
-                        ckpt_path='/home/bepro/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
+                        ckpt_path='/root/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
     
     input_data = {}
     video = mmcv.VideoReader(path2video)
@@ -466,7 +464,7 @@ def remove_compex_scene_id(path2hypothesis, transform, size):
             # write new result
             log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (frame_idx, tid, x1, y1, w, h, s))
 
-def remove_compex_scene_id_grid(path2hypothesis, transform, size):
+def remove_compex_scene_id_grid(file_in, file_out, transform, size):
     v_t = 20
     h_t = 30
 
@@ -487,14 +485,14 @@ def remove_compex_scene_id_grid(path2hypothesis, transform, size):
             pos = (i,j)
             grid[pos] = [ty,tx]
 
-    hypothesis = np.loadtxt("./hypothesis_.txt", delimiter=',')
+    hypothesis = np.loadtxt(file_in, delimiter=',')
     frame_indices = hypothesis[:, 0].astype(np.int)
 
     min_frame_idx = frame_indices.astype(np.int).min()
     max_frame_idx = frame_indices.astype(np.int).max()
 
-    log_filename = './hypothesis.txt'
-    log_file = open(log_filename, 'w')
+    # log_filename = './hypothesis.txt'
+    log_file = open(file_out, 'w')
 
     print ("==> removing complex scene ids")
     b2t = {}
@@ -529,3 +527,15 @@ def remove_compex_scene_id_grid(path2hypothesis, transform, size):
                     tid, x1, y1, w, h, s = int(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5]), int(r[9])
                     # write new result
                     log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (frame_idx, tid, x1, y1, w, h, s))
+
+        # writing id's outside of pitch
+        for n,p in enumerate(_wc):
+            # p is normalised
+            xp = p[0]*transform.parameter.get("ground_width")
+            yp = p[1]*transform.parameter.get("ground_height")
+
+            if xp<=0. or yp<=0. or xp>=float(transform.parameter.get("ground_width")) or yp>=float(transform.parameter.get("ground_height")):
+                r = rows[n]
+                tid, x1, y1, w, h, s = int(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5]), int(r[9])
+                # write new result
+                log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (frame_idx, tid, x1, y1, w, h, s))
