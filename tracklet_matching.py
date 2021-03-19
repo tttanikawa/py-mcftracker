@@ -4,6 +4,8 @@ from mcftracker import MinCostFlowTracker
 import helper
 
 import json
+import numpy as np
+from node import GraphNode
 
 def tracklet_matching(tracklets, nh, nt, nht, data):
     # create data sctruct
@@ -87,11 +89,56 @@ def hypot2id(hypot, ttype, all_tracklets, data_in, transform):
 
             fdiff = int(nexFname) - int(curFname)
 
-            print ('%d -> %d dist=%f fdiff=%d' % (nexId, curId, dist, fdiff))
+            print ('%d -> %d dist=%f fn:[%d-%d] fdiff=%d' % (nexId, curId, dist, int(curFname), int(nexFname), fdiff))
         
         print ('-----------------------------------------------------------')
     
     return matches
+
+def interpolate_gap(hypothesis, data, s, e):
+    ns = hypothesis[s][-1] # tuple ('frame_num', detection_index, 'u')
+    ne = hypothesis[e][0]
+
+    fs = int(ns[0])
+    fe = int(ne[0])
+
+    bs = data[ns[0]][ns[1]]._bb
+    be = data[ne[0]][ne[1]]._bb
+
+    if fe-fs >= 20:
+        return
+
+    # print ('%d -> %d > %s -> %s' % (fs,fe,bs,be))
+
+    fpx1 = [bs[0], be[0]]
+    fpy1 = [bs[1], be[1]]
+    fpx2 = [bs[2], be[2]]
+    fpy2 = [bs[3], be[3]]
+
+    xp = [fs, fe]
+
+    for x in range(fs+1, fe):
+        pix1 = np.interp(x, xp, fpx1)
+        piy1 = np.interp(x, xp, fpy1)
+        pix2 = np.interp(x, xp, fpx2)
+        piy2 = np.interp(x, xp, fpy2)
+
+        print ('%d -> %s' % (x, [pix1,piy1,pix2,piy2]))
+        pi = [pix1,piy1,pix2,piy2]
+
+        gn = GraphNode([0.,0.], pi, 0., 0)
+        fn = str(x)
+
+        index = len(data[fn])
+        data[fn].append(gn)
+
+        node_u = (fn, index, "u")
+        node_v = (fn, index, "v")
+
+        hypothesis[s].append(node_u)
+        hypothesis[s].append(node_v)
+
+    return
 
 def cost_flow_tracklet(assoc_tracklets, nh, nt, nht, data_in, transform):
 # def cost_flow_tracklet(data_in, transform):
@@ -137,11 +184,12 @@ def cost_flow_tracklet(assoc_tracklets, nh, nt, nht, data_in, transform):
 
     # combining tracks	
     for match in matches:
+        trklt_s = assoc_tracklets[match[0][0]]
         for i in range(1,len(match)):
-                trklt_s = assoc_tracklets[match[0][0]]
-                trklt_d = assoc_tracklets[match[i][0]]
-                for node in trklt_d:
-                    trklt_s.append(node)
+            trklt_d = assoc_tracklets[match[i][0]]
+            interpolate_gap(assoc_tracklets, data_in, match[0][0], match[i][0])
+            for node in trklt_d:
+                trklt_s.append(node)
     
     # erasing old tracks
     for match in matches:

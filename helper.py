@@ -4,7 +4,7 @@ import numpy as np
 import mmcv
 
 import sys
-sys.path.append('/root/bepro-python')
+# sys.path.append('/root/bepro-python')
 
 import torch
 from pfe.torchreid.utils import FeatureExtractor
@@ -124,7 +124,8 @@ def convert2world_post(rows, size, transform):
     return wc
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
-                        ckpt_path='/root/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
+                        # ckpt_path='/root/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
+                        ckpt_path='/home/bepro/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
     
     input_data = {}
     video = mmcv.VideoReader(path2video)
@@ -204,7 +205,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             cx, cy = transform.video_to_ground(p[0], p[1])
             _wc.append((cx,cy))
 
-            node = GraphNode((cx,cy), curbox, s, 0, copy.deepcopy(imgbox))
+            node = GraphNode((cx,cy), curbox, s, 0)
 
             bbimgs.append(imgbox)
             node_lst.append(node)
@@ -227,7 +228,6 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
 def write_output_data(log_filename, track_hypot, path2det, data, iend, frame_offset, iid, parity):
     # write to file
-    # log_filename = './hypothesis.txt'
     log_file = open(log_filename, 'w')
 
     f = 1

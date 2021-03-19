@@ -1,5 +1,5 @@
 class GraphNode:
-    def __init__(self, wc, bb, score, status, image, feat_v=None):
+    def __init__(self, wc, bb, score, status, feat_v=None):
         self._3dc = wc
         self._bb = bb
         self._score = score
@@ -7,4 +7,4 @@ class GraphNode:
         # self._is_complex = is_complex
         self._status = status
         self._feat = feat_v
-        self._image = image
+        # self._image = image
