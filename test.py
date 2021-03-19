@@ -44,13 +44,12 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     # helper.write_output_data(out_file, track_hypot, path2det, data, len(data)+1, frame_offset, iid, parity)
     # debug.visualise_tracks(out_file, path2video, slice_start, slice_end, _wc, transform, size, out_video)
 
-    out_file_pre = './hypothesis_pre.txt'
+    # out_file_pre = './hypothesis_pre.txt'
     out_file = './hypothesis.txt'
     out_video = './out.avi'
     
     tracks = tracklet_matching.cost_flow_tracklet(track_hypot, nh, nt, nht, data, transform)
-    helper.write_output_data(out_file_pre, tracks, path2det, data, len(data)+1, frame_offset, iid, parity)
-    helper.remove_compex_scene_id_grid(out_file_pre, out_file, transform, size)
+    helper.write_output_data(out_file, tracks, path2det, data, len(data)+1, frame_offset, iid, parity)
     debug.visualise_tracks(out_file, path2video, slice_start, slice_end, _wc, transform, size, out_video)
 
 if __name__ == "__main__":

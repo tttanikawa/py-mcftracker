@@ -48,11 +48,7 @@ class MinCostFlowTracker:
         return n
 
     def _return_max_dist(self,x):
-        # if x == 0:
-        #     return 1.0
-        # if x == 1:
-        #     return 1.2
-        if x < 10:
+        if x <= 10:
             return 4.0
         return 4*math.log10(x)
 
@@ -125,7 +121,7 @@ class MinCostFlowTracker:
 
         return -math.log(prob)
     
-    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.5, c=0.6):
+    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.2, c=0.7):
         u = prev_node._feat
         v = cur_node._feat
 
@@ -145,9 +141,9 @@ class MinCostFlowTracker:
             return -1
 
         prob_dst = np.float32(1.0 - dst_eucl / dst_max)
-        prob_sim = c*prob_dst + (1.0-c)*prob_color
+        # prob_sim = c*prob_dst + (1.0-c)*prob_color
 
-        return -math.log(prob_sim)
+        return -math.log(prob_dst)
 
     def build_network(self, last_img_name, transform, size, f2i_factor=10000):
         self.mcf = pywrapgraph.SimpleMinCostFlow()

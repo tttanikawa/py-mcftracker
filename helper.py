@@ -202,7 +202,6 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             
             p = box2midpoint_normalised(curbox, size[1], size[0])
             cx, cy = transform.video_to_ground(p[0], p[1])
-            # cx, cy = transform.video_to_ground(x1/size[1], y1/size[0])
             _wc.append((cx,cy))
 
             node = GraphNode((cx,cy), curbox, s, 0, copy.deepcopy(imgbox))
@@ -331,72 +330,6 @@ def calc_eucl_dist(det1, det2):
     dist = np.linalg.norm(pt1_np-pt2_np)
     return dist
 
-# def return_max_dist(x):
-#     if x == 1:
-#         return 1.2
-#     return 4*math.log10(x)
-
-# def cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size, inf=1e6, max_gap=80):
-#     cost_mtx = np.zeros((len(hypothesis_t), len(hypothesis_s)))
-
-#     for i, index_i in enumerate(hypothesis_t):
-#         for j, index_j in enumerate(hypothesis_s):
-#             last_idx = hypothesis[index_i][-1] # tuple ('frame_num', detection_index, 'u')
-#             first_idx = hypothesis[index_j][0]
-
-#             # gap = int(first_idx[0]) - int(last_idx[0])s
-#             gap = int(first_idx[0]) - int(last_idx[0]) + 1
-            
-#             feat_tail = data[last_idx[0]][last_idx[1]]._feat
-#             feat_head = data[first_idx[0]][first_idx[1]]._feat
-
-#             det_tail = data[last_idx[0]][last_idx[1]]._bb
-#             det_head = data[first_idx[0]][first_idx[1]]._bb
-
-#             cost_mtx[i][j] = compute_cost(feat_tail, feat_head, det_tail, det_head, transform, size, gap)
-
-#             # check if gap isn't too large
-#             if gap >= max_gap:
-#                 cost_mtx[i][j] = inf
-
-#     return cost_mtx
-
-# def temporal_hungarian_matching(hypothesis, hypothesis_t, hypothesis_s, data, transform, size):
-#     print (hypothesis[0])
-#     print (len(hypothesis))
-#     print ('temporal hungarian assignment')
-#     print (hypothesis_t)
-#     print ('---------')
-#     print (hypothesis_s)
-
-#     cost = cost_matrix(hypothesis, hypothesis_t, hypothesis_s, data, transform, size)
-    
-#     # assignment
-#     row_ind, col_ind = linear_sum_assignment(cost)
-
-#     matches = []
-#     for r,c in zip(row_ind, col_ind):
-#         if cost[r][c] != 1e6:
-#             print ('id %d -> id %d - frames: [%d-%d] cost: %f' % (hypothesis_t[r]+1, hypothesis_s[c]+1, 
-#                         2*int(hypothesis[hypothesis_t[r]][-1][0]), 2*int(hypothesis[hypothesis_s[c]][0][0]), cost[r][c]))
-#             matches.append((hypothesis_t[r], hypothesis_s[c]))
-
-#     # sort matches in descending order of hypothesis_s
-#     matches.sort(key=lambda tup: tup[1], reverse=True)
-#     # print ('matches after sorting ==>')
-#     # print (matches)
-
-#     # # combining two tracks	
-#     for s,e in matches:
-#         for node in hypothesis[e]:
-#             hypothesis[s].append(node)
-
-#     # # deleting old track
-#     for _,e in matches:
-#         hypothesis[e].clear()
-
-#     return
-
 def build_hypothesis_lst(flow_dict, source_idx, sink_idx):
     track_hypot = []
 
@@ -422,18 +355,11 @@ def build_hypothesis_lst(flow_dict, source_idx, sink_idx):
             nht.append(n)
         elif s_node[0] == source_idx and t_node[0] == sink_idx:
             ht.append(n)
-            
-        # if s_node[0] != source_idx:
-        #     tr_bgn.append(n)
-
-        # if t_node[0] != sink_idx:
-        #     tr_end.append(n)
-    
+                
     print ('# tracklets not ending at last frame: %d' % (len(nt)))
     print ('# tracklets not starting at first frame: %d' % (len(nh)))
     print ('# tracklets not starting at first and not ending at last frame: %d' %(len(nht)))
     print ('# tracklets complete: %d' % (len(ht)))
-    # print ('# tracklets: %d' % len(track_hypot))
 
     return track_hypot, nt, nh, nht
 
