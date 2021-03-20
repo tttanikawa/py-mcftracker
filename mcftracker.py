@@ -122,7 +122,7 @@ class MinCostFlowTracker:
 
         return -math.log(prob)
     
-    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.5, c=0.70):
+    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.5, c=0.50):
         u = prev_node._feat
         v = cur_node._feat
 
@@ -146,7 +146,7 @@ class MinCostFlowTracker:
 
         return -math.log(prob_sim)
 
-    def build_network(self, last_img_name, transform, size, f2i_factor=10000):
+    def build_network(self, last_img_name, transform, size, f2i_factor=100000):
         self.mcf = pywrapgraph.SimpleMinCostFlow()
 
         for n, (image_name, node_lst) in enumerate(sorted(self._data.items(), key=lambda t: tools.get_key(t[0]))):
