@@ -17,6 +17,7 @@ from scipy.spatial import distance
 
 import debug
 import copy
+import utils
 
 import matplotlib.pyplot as plt
 from scipy.misc import face
@@ -25,6 +26,7 @@ import math
 
 from node import GraphNode
 from scipy import interpolate
+from bbox import Box
 
 def isGoalArea(transform, xwc, size=None, frame=None):
 
@@ -123,7 +125,8 @@ def convert2world_post(rows, size, transform):
     return wc
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
-                        ckpt_path='/root/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
+                        ckpt_path='/root/py-mcftracker/pfe/checkpoints/market_combined_120e.pth',
+                        min_confidence=0.6, max_iou=0.99):
     
     input_data = {}
     video = mmcv.VideoReader(path2video)
@@ -191,19 +194,27 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
         bbimgs = []
         node_lst = []
- 
         _wc = []
+        boxes = []
+
         for n,r in enumerate(rows):
             _, x1, y1, x2, y2, s = int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])
+            boxes.append(Box([x1,y1,x2,y2], s))
 
-            curbox = [x1,y1,x2,y2]
-            imgbox = frame[int(y1):int(y2), int(x1):int(x2), :]
-            
-            p = box2midpoint_normalised(curbox, size[1], size[0])
+        boxes = [b for b in boxes if b.confidence >= min_confidence]
+
+        # Run non-maxima suppression.
+        blst = np.array([b.to_tlwh() for b in boxes])
+        scrlst = np.array([b.confidence for b in boxes])
+        indices = utils.non_max_suppression(blst, max_iou, scrlst)
+        boxes_nms = [boxes[i] for i in indices]
+
+        for box in boxes_nms:
+            imgbox = frame[int(box.tlbr[1]):int(box.tlbr[3]), int(box.tlbr[0]):int(box.tlbr[2]), :]
+            p = box2midpoint_normalised(box.tlbr, size[1], size[0])
             cx, cy = transform.video_to_ground(p[0], p[1])
             _wc.append((cx,cy))
-
-            node = GraphNode((cx,cy), curbox, s, 0)
+            node = GraphNode((cx,cy), box.tlbr, box.confidence, 0)
 
             bbimgs.append(imgbox)
             node_lst.append(node)

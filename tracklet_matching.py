@@ -123,7 +123,7 @@ def interpolate_gap(hypothesis, data, s, e):
         pix2 = np.interp(x, xp, fpx2)
         piy2 = np.interp(x, xp, fpy2)
 
-        print ('%d -> %s' % (x, [pix1,piy1,pix2,piy2]))
+        # print ('%d -> %s' % (x, [pix1,piy1,pix2,piy2]))
         pi = [pix1,piy1,pix2,piy2]
 
         gn = GraphNode([0.,0.], pi, 0., 0)

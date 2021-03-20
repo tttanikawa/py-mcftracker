@@ -50,7 +50,7 @@ class MinCostFlowTracker:
     def _return_max_dist(self,x):
         if x <= 10:
             return 4.0
-        return 4.5*math.log10(x)
+        return 4.8*math.log10(x)
 
     def _find_nearest_fib(self, num):
         for n in range(num):
@@ -79,7 +79,7 @@ class MinCostFlowTracker:
         else:
             return 10000
     
-    def _calc_cost_tracklet(self, prev_node, cur_node, transform, max_gap=60, c=0.40):
+    def _calc_cost_tracklet(self, prev_node, cur_node, transform, max_gap=80, c=0.40):
         # last frame index of prev_node
         # first frame index of cur_node
         lfPn = prev_node._efIdx
@@ -122,7 +122,7 @@ class MinCostFlowTracker:
 
         return -math.log(prob)
     
-    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.2, c=0.5):
+    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.5, c=0.70):
         u = prev_node._feat
         v = cur_node._feat
 
@@ -133,7 +133,7 @@ class MinCostFlowTracker:
 
         prob_color = np.float32(cosine_similarity([u],[v])[0][0])
         
-        if prob_color <= 0.82:
+        if prob_color <= 0.80:
             return -1
 
         dst_eucl = np.linalg.norm(a-b)
@@ -146,8 +146,7 @@ class MinCostFlowTracker:
 
         return -math.log(prob_sim)
 
-    # def build_network(self, last_img_name, transform, size, f2i_factor=10000):
-    def build_network(self, last_img_name, transform, size, f2i_factor=100000):
+    def build_network(self, last_img_name, transform, size, f2i_factor=10000):
         self.mcf = pywrapgraph.SimpleMinCostFlow()
 
         for n, (image_name, node_lst) in enumerate(sorted(self._data.items(), key=lambda t: tools.get_key(t[0]))):
