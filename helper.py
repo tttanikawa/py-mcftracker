@@ -29,7 +29,7 @@ from scipy import interpolate
 from bbox import Box
 
 sys.path.append("../")
-from mmdetection.demo.inference_demo import get_masks_from_image_lst
+from mmdetection.demo.inference_demo import init_segmentor, get_masks_from_image_lst
 
 def isGoalArea(transform, xwc, size=None, frame=None):
 
@@ -134,13 +134,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
     input_data = {}
     video = mmcv.VideoReader(path2video)
 
-    # testing torche reid import
-    extractor = FeatureExtractor(
-        model_name='osnet_x1_0',
-        model_path=ckpt_path,
-        device='cuda'
-    )
-
+    segmentor = init_segmentor()
     match_video = MatchVideo.load(match_video_id)
 
     transform = Transform(
@@ -228,8 +222,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             print ('no images')
             continue
         
-        # masks = get_masks_from_image(frame, fnum, './dump')
-        masks = get_masks_from_image_lst(bbimgs)
+        masks = get_masks_from_image_lst(segmentor, bbimgs)
         masks_p = utils.preprocess_masks(masks, bbimgs)
 
         # checking masks
@@ -246,18 +239,12 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
         for i,node in enumerate(node_lst):
             node._hist = tools.calc_RGB_histogram(bbimgs[i], node._mask)
-            # node._hist = tools.calc_HS_histogram(bbimgs[i], node._mask)
 
-        feats = network_feed_from_list(bbimgs, extractor)
-
-        for i,node in enumerate(node_lst):
-            node._feat = feats[i]
         input_data[image_name] = node_lst
         
-        if fnum == 12:
-            print ('dumping appearance image')
-            debug.validate_hist_mask_bhattacharyya(node_lst, frame)
-
+        # if fnum == 16:
+        #     print ('dumping appearance image')
+        #     debug.validate_hist_mask_bhattacharyya(node_lst, frame)
 
     print ('-> %d images have been read & processed' % (len(input_data)))
 
