@@ -29,6 +29,8 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     data, transform, size, parity, _wc, lf_i = helper.read_input_data(
         path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id)
 
+    # debug.validate_hist_mask_bhattacharyya(path2video, [17854], data)
+
     start = time.time()
     tracker = MinCostFlowTracker(data, 0, 0.1, 0.1)
 

@@ -28,6 +28,9 @@ from node import GraphNode
 from scipy import interpolate
 from bbox import Box
 
+sys.path.append("../")
+from mmdetection.demo.inference_demo import get_masks_from_image_lst
+
 def isGoalArea(transform, xwc, size=None, frame=None):
 
     gp = [[0, 54.16, 0], [16.5, 54.16, 0], [0, 13.84, 0], [16.5, 13.84, 0],
@@ -224,12 +227,37 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
         if len(bbimgs) == 0:
             print ('no images')
             continue
+        
+        # masks = get_masks_from_image(frame, fnum, './dump')
+        masks = get_masks_from_image_lst(bbimgs)
+        masks_p = utils.preprocess_masks(masks, bbimgs)
+
+        # checking masks
+        # for m in masks_p:
+        #     idx = m[0]
+        #     mask = m[1]
+        #     crop = bbimgs[idx]
+        #     crop[mask] = crop[mask] * 0.5 
+
+        for m in masks_p:
+            idx = m[0]
+            mask = m[1]
+            node_lst[idx]._mask = mask
+
+        for i,node in enumerate(node_lst):
+            node._hist = tools.calc_RGB_histogram(bbimgs[i], node._mask)
+            # node._hist = tools.calc_HS_histogram(bbimgs[i], node._mask)
 
         feats = network_feed_from_list(bbimgs, extractor)
 
         for i,node in enumerate(node_lst):
             node._feat = feats[i]
         input_data[image_name] = node_lst
+        
+        if fnum == 12:
+            print ('dumping appearance image')
+            debug.validate_hist_mask_bhattacharyya(node_lst, frame)
+
 
     print ('-> %d images have been read & processed' % (len(input_data)))
 

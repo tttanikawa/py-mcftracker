@@ -226,12 +226,12 @@ def validate_appereance_model(image, detections, features):
     cv2.imwrite('appearance_eval.jpg', image)
 
 
-def return_closest_box_index(cur_box, ref_frame_dets, frame, cur_box_index):
+def return_closest_box_index(cur_box, prev_nodes, frame, cur_box_index):
     max_iou = 0.
     max_index = -1
 
-    for j, det in enumerate(ref_frame_dets):
-        iou = tools.calc_overlap(cur_box, det)
+    for j, node in enumerate(prev_nodes):
+        iou = tools.calc_overlap(cur_box, node._bb)
 
         if iou > max_iou:
             max_iou = iou
@@ -288,6 +288,7 @@ def validate_cosine_with_detections(path2video, frame_num_lst, detections, featu
             if ref_index == -1:
                 continue
             
+
             cd = distance.cosine(features[image_name][i], features[prev_img_name][ref_index])
 
             # rot_img = rotate(images[image_name][i], 90)
@@ -315,4 +316,69 @@ def validate_cosine_with_detections(path2video, frame_num_lst, detections, featu
 
 
 
+def validate_hist_mask_bhattacharyya(frame_data, image):
+    n = len(frame_data)
+    anchor_idx = randrange(n-1)
 
+    x = {}
+
+    for i, node in enumerate(frame_data):
+        if i == anchor_idx:
+            continue
+
+        bhat_dist = tools.calc_bhattacharyya_distance(node._hist, frame_data[anchor_idx]._hist)
+        x[i] = bhat_dist
+
+    sorted_x = sorted(x.items(), key=operator.itemgetter(1))
+    group_blue = []
+
+    for item in sorted_x:
+        group_blue.append((frame_data[item[0]], item[1]))
+
+    col = 255, 0, 0
+    _col = 0, 255, 0
+    thick = 3
+
+    for ind, tup in enumerate(group_blue):
+        node, score = tup[0], tup[1]
+        bbox = node._bb
+        pt1 = int(bbox[0]), int(bbox[1])
+        pt2 = int(bbox[2]), int(bbox[3])
+        center = pt1[0] + 5, pt1[1] + 5
+        cv2.rectangle(image, pt1, pt2, col, thick)
+        cv2.putText(image, str(round(score, 6)), center, cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 255), 1)
+    
+    _pt1 = int(frame_data[anchor_idx]._bb[0]), int(frame_data[anchor_idx]._bb[1]) 
+    _pt2 = int(frame_data[anchor_idx]._bb[2]), int(frame_data[anchor_idx]._bb[3]) 
+    cv2.rectangle(image, _pt1, _pt2, _col, thick)
+
+    cv2.imwrite('./_validate_cosine_with_dets.jpg', image)
+
+    # # frame_num - frame number of anchor frame: cos distance between this frame and previous will be visualised
+    # for frame_num in frame_num_lst:
+    #     video = mmcv.VideoReader(path2video)
+    #     frame = video[frame_num-1]
+
+    #     # image_name = str(frame_num)
+    #     # prev_img_name = str(frame_num-1)
+
+    #     image_name = str(int(frame_num/2))
+    #     prev_img_name = str(int(image_name)-1)
+
+    #     for i, node in enumerate(data[image_name]):
+    #         ref_index = return_closest_box_index(node._bb, data[prev_img_name], frame, i)
+
+    #         if ref_index == -1:
+    #             continue
+        
+    #         bhat_dist = tools.calc_bhattacharyya_distance(node._hist, data[prev_img_name][ref_index]._hist)
+
+    #         pt1 = int(node._bb[0]), int(node._bb[1])
+    #         pt2 = int(node._bb[2]), int(node._bb[3])
+    #         center = pt1[0] + 5, pt1[1] + 5
+    #         cv2.putText(frame, str(round(bhat_dist, 6)), center, cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 0), 1)
+
+    #     # _pt1 = int(detections[anchor_idx][0]), int(detections[anchor_idx][1]) 
+    #     # _pt2 = int(detections[anchor_idx][2]), int(detections[anchor_idx][3]) 
+    #     # cv2.rectangle(image, _pt1, _pt2, _col, thick)
+    #     cv2.imwrite('./%d_validate_cosine_with_dets.jpg' % (frame_num), frame)

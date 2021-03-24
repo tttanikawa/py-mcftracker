@@ -64,3 +64,31 @@ def non_max_suppression(boxes, max_bbox_overlap, scores=None):
                 ([last], np.where(overlap > max_bbox_overlap)[0])))
 
     return pick
+
+
+def preprocess_masks(masks,images):
+    ret = []
+
+    for mtpl in masks:
+        mlst, idx = mtpl[1], mtpl[0]
+
+        if len(mlst) == 0:
+            narr = np.full((images[idx].shape[0],images[idx].shape[1]), True, dtype=bool)
+            ret.append((idx,narr))
+
+        elif len(mlst) > 1:
+            narr = np.zeros(mlst[0].shape, dtype=bool)
+
+            for m in mlst:
+                for i in range(m.shape[0]):
+                    for j in range(m.shape[1]):
+
+                        if m[i][j] == True:
+                            narr[i][j] = True
+            
+            ret.append((idx,narr))
+
+        else:
+            ret.append((idx,mlst[0]))
+
+    return ret
