@@ -180,7 +180,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
         fnum = fnum+1
 
-        if fnum % 500 == 0:
+        if fnum % 100 == 0:
             print ('-> reading frame %d / %d' % (fnum, slice_end-slice_start))
 
         mask = frame_indices == (index - slice_start + 1)

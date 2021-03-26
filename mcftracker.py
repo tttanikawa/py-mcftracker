@@ -122,20 +122,16 @@ class MinCostFlowTracker:
 
         return -math.log(prob)
     
-    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.5, c=0.50):
-        u = prev_node._feat
-        v = cur_node._feat
+    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.2, c=0.30):
+        u = prev_node._hist
+        v = cur_node._hist
 
         pxy = (prev_node._3dc[0]*transform.parameter.get("ground_width"), prev_node._3dc[1]*transform.parameter.get("ground_height"))
         cxy = (cur_node._3dc[0]*transform.parameter.get("ground_width"), cur_node._3dc[1]*transform.parameter.get("ground_height"))
         a = np.array(pxy)
         b = np.array(cxy)
 
-        prob_color = np.float32(cosine_similarity([u],[v])[0][0])
-        
-        if prob_color <= 0.80:
-            return -1
-
+        prob_color = 1.0-tools.calc_bhattacharyya_distance(u, v)
         dst_eucl = np.linalg.norm(a-b)
 
         if dst_eucl >= dst_max:
