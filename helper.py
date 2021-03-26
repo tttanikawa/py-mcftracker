@@ -31,6 +31,9 @@ from bbox import Box
 sys.path.append("../")
 from mmdetection.demo.inference_demo import init_segmentor, get_masks_from_image_lst
 
+sys.path.append("../mmdetection/")
+import mmcv
+
 def isGoalArea(transform, xwc, size=None, frame=None):
 
     gp = [[0, 54.16, 0], [16.5, 54.16, 0], [0, 13.84, 0], [16.5, 13.84, 0],
@@ -226,11 +229,12 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
         masks_p = utils.preprocess_masks(masks, bbimgs)
 
         # checking masks
+        # color_mask = np.array(mmcv.color_val('green')[::-1], dtype=np.uint8)
         # for m in masks_p:
         #     idx = m[0]
         #     mask = m[1]
         #     crop = bbimgs[idx]
-        #     crop[mask] = crop[mask] * 0.5 
+        #     crop[mask] = crop[mask] * 0.5 + color_mask * 0.5
 
         for m in masks_p:
             idx = m[0]

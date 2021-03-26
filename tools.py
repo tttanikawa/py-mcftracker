@@ -8,8 +8,6 @@ according to those terms.
 
 import cv2
 import sys
-sys.path.append("../mmdetection/")
-import mmcv
 import numpy as np
 
 def get_key(key):
