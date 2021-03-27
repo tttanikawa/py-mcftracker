@@ -214,7 +214,9 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             p = box2midpoint_normalised(box.tlbr, size[1], size[0])
             cx, cy = transform.video_to_ground(p[0], p[1])
             _wc.append((cx,cy))
-            node = GraphNode((cx,cy), box.tlbr, box.confidence, 0)
+
+            mskt_ = np.full((imgbox.shape[0],imgbox.shape[1]), True, dtype=bool)
+            node = GraphNode((cx,cy), box.tlbr, box.confidence, 0, mask=mskt_)
 
             bbimgs.append(imgbox)
             node_lst.append(node)
@@ -240,7 +242,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             idx = m[0]
             mask = m[1]
             node_lst[idx]._mask = mask
-
+                
         for i,node in enumerate(node_lst):
             node._hist = tools.calc_RGB_histogram(bbimgs[i], node._mask)
 
@@ -257,6 +259,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 def write_output_data(log_filename, track_hypot, path2det, data, iend, frame_offset, iid, parity):
     # write to file
     log_file = open(log_filename, 'w')
+    log_file_mask = open('./masks.txt', 'w')
 
     f = 1
     all_lines = []
@@ -271,9 +274,15 @@ def write_output_data(log_filename, track_hypot, path2det, data, iend, frame_off
                         bi = int(t[1])
                         b = data[t[0]][bi]._bb
                         s = data[t[0]][bi]._status
-                        # must be in top-left-width-height
-                        lines.append([f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], s])
-                        # log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], 1))
+                        wc = data[t[0]][bi]._3dc
+
+                        if wc[0] == 0. and wc[1] == 0.: # interpolated in tracklet matching
+                            mask = [[]]
+                        else:
+                            mask = data[t[0]][bi]._mask.astype(np.uint8).tolist()
+
+                        lines.append([f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], s, mask])
+                        
 
         all_lines.append(lines)
         f = f+2
@@ -292,17 +301,21 @@ def write_output_data(log_filename, track_hypot, path2det, data, iend, frame_off
 
             for l in fl:
                 log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
+                log_file_mask.write(str(l[7])+'\n')
 
             for l in al:
                 log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
+                log_file_mask.write(str(l[7])+'\n')
         
         # last index
         li = len(all_lines)-1
         for l in all_lines[li]:
             log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
+            log_file_mask.write(str(l[7])+'\n')
 
         for l in all_lines[li]:
             log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0]+1, l[1], l[2], l[3], l[4], l[5], l[6]))
+            log_file_mask.write(str(l[7])+'\n')
 
     else:
         for i in range(len(all_lines)-1):
@@ -318,14 +331,19 @@ def write_output_data(log_filename, track_hypot, path2det, data, iend, frame_off
 
             for l in fl:
                 log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
+                log_file_mask.write(str(l[7])+'\n')
 
             for l in al:
                 log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
+                log_file_mask.write(str(l[7])+'\n')
 
         # write last line
         li = len(all_lines)-1
         for l in all_lines[li]:
             log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
+            log_file_mask.write(str(l[7])+'\n')
+
+
 
 def extract_patch_block(patch):
     h, w = patch.shape[0], patch.shape[1]

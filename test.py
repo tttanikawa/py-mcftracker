@@ -17,7 +17,10 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
 
     if os.path.exists("./hypothesis.txt"):
         os.remove("./hypothesis.txt")
-    
+
+    if os.path.exists("./masks.txt"):
+        os.remove("./masks.txt")
+
     det_in = np.loadtxt(path2det, delimiter=',')
     frame_indices = det_in[:, 0].astype(np.int)
     # min_frame_idx = frame_indices.astype(np.int).min()

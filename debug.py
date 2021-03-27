@@ -10,6 +10,8 @@ import operator
 import matplotlib.pyplot as plt
 import helper
 
+import ast
+
 def get_patch_by_id(tracker, track_num, detections, images, features):
     # get hypothesis file
     # extract all lines with field == track_num
@@ -101,6 +103,14 @@ def visualise_tracks(filename, path2video, slice_start, slice_end, _wc, transfor
     hypothesis = np.loadtxt(filename, delimiter=',')
     frame_indices = hypothesis[:, 0].astype(np.int)
     
+    fmask=open('./masks.txt','r')
+    fmaskLst = [line.rstrip() for line in fmask]
+
+    print (len(fmaskLst))
+    print (type(fmaskLst[0]))
+
+    color_mask = np.array(mmcv.color_val('green')[::-1], dtype=np.uint8)
+
     out_size = (1800, 450)
     vout = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc('M','J','P','G'), 25, out_size)
 
@@ -117,10 +127,17 @@ def visualise_tracks(filename, path2video, slice_start, slice_end, _wc, transfor
 
         cv2.putText(frame, str(frame_idx-slice_start+1), (150, 200), cv2.FONT_HERSHEY_PLAIN, 4, (0,0,255), 4)
 
-        for r in rows:	
+        for i,r in enumerate(rows):	
             tid, x1, y1, w, h, s = int(r[1]), int(r[2]), int(r[3]), int(r[4]), int(r[5]), int(r[9])
             cv2.putText(frame, str(tid), (x1, y1), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,255), 2)
-        
+
+            mask = ast.literal_eval(fmaskLst[i])
+            mask_np = np.array(mask).astype(bool)
+
+            mh, mw = mask_np.shape[0], mask_np.shape[1]
+            crop = frame[int(y1):int(y1)+mh, int(x1):int(x1)+mw, :]
+            crop[mask_np] = crop[mask_np] * 0.5 + color_mask * 0.5
+
         if frame_idx in _wc:
             for c in _wc[frame_idx]:
                 vx, vy = transform.ground_to_video(c[0], c[1])
