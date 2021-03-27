@@ -23,7 +23,6 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
 
     det_in = np.loadtxt(path2det, delimiter=',')
     frame_indices = det_in[:, 0].astype(np.int)
-    # min_frame_idx = frame_indices.astype(np.int).min()
     max_frame_idx = frame_indices.astype(np.int).max()
 
     slice_start = 0 if frame_offset == 0 else frame_offset-1
@@ -31,8 +30,6 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
 
     data, transform, size, parity, _wc, lf_i = helper.read_input_data(
         path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id)
-
-    # debug.validate_hist_mask_bhattacharyya(path2video, [17854], data)
 
     start = time.time()
     tracker = MinCostFlowTracker(data, 0, 0.1, 0.1)
@@ -48,19 +45,13 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     print("Optimal number of flow: {}".format(optimal_flow))
     print("Optimal cost: {}".format(optimal_cost))
 
-    # out_file = './hypothesis_pre.txt'
-    # out_video = './out_pre.avi'
     track_hypot, nt, nh, nht = helper.build_hypothesis_lst(tracker.flow_dict, "1", lf_i)
-    # helper.write_output_data(out_file, track_hypot, path2det, data, len(data)+1, frame_offset, iid, parity)
-    # debug.visualise_tracks(out_file, path2video, slice_start, slice_end, _wc, transform, size, out_video)
-
-    # out_file_pre = './hypothesis_pre.txt'
     out_file = './hypothesis.txt'
     out_video = './out.avi'
     
     tracks = tracklet_matching.cost_flow_tracklet(track_hypot, nh, nt, nht, data, transform)
-    helper.write_output_data(out_file, tracks, path2det, data, len(data)+1, frame_offset, iid, parity)
-    debug.visualise_tracks(out_file, path2video, slice_start, slice_end, _wc, transform, size, out_video)
+    helper.write_output_data(out_file, tracks, path2det, data, len(data)+1, frame_offset, iid, parity, draw_mask=False)
+    debug.visualise_tracks(out_file, path2video, slice_start, slice_end, _wc, transform, size, out_video, draw_mask=False)
 
 if __name__ == "__main__":
     path2video = sys.argv[1]

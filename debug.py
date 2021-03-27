@@ -99,15 +99,15 @@ def visualise_hypothesis_with_detections(path2video, data, slice_start, slice_en
 
     vout.release()
 
-def visualise_tracks(filename, path2video, slice_start, slice_end, _wc, transform, size, video_name):
+def visualise_tracks(filename, path2video, slice_start, slice_end, _wc, transform, size, video_name, draw_mask=True):
     hypothesis = np.loadtxt(filename, delimiter=',')
     frame_indices = hypothesis[:, 0].astype(np.int)
     
-    fmask=open('./masks.txt','r')
-    fmaskLst = [line.rstrip() for line in fmask]
-
-    print (len(fmaskLst))
-    print (type(fmaskLst[0]))
+    if draw_mask:
+        fmask=open('./masks.txt','r')
+        fmaskLst = [line.rstrip() for line in fmask]
+        print (len(fmaskLst))
+        print (type(fmaskLst[0]))
 
     color_mask = np.array(mmcv.color_val('green')[::-1], dtype=np.uint8)
 
@@ -131,12 +131,13 @@ def visualise_tracks(filename, path2video, slice_start, slice_end, _wc, transfor
             tid, x1, y1, w, h, s = int(r[1]), int(r[2]), int(r[3]), int(r[4]), int(r[5]), int(r[9])
             cv2.putText(frame, str(tid), (x1, y1), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,255), 2)
 
-            mask = ast.literal_eval(fmaskLst[i])
-            mask_np = np.array(mask).astype(bool)
+            if draw_mask:
+                mask = ast.literal_eval(fmaskLst[i])
+                mask_np = np.array(mask).astype(bool)
 
-            mh, mw = mask_np.shape[0], mask_np.shape[1]
-            crop = frame[int(y1):int(y1)+mh, int(x1):int(x1)+mw, :]
-            crop[mask_np] = crop[mask_np] * 0.5 + color_mask * 0.5
+                mh, mw = mask_np.shape[0], mask_np.shape[1]
+                crop = frame[int(y1):int(y1)+mh, int(x1):int(x1)+mw, :]
+                crop[mask_np] = crop[mask_np] * 0.5 + color_mask * 0.5
 
         if frame_idx in _wc:
             for c in _wc[frame_idx]:

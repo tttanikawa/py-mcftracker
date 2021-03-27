@@ -230,14 +230,6 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
         masks = get_masks_from_image_lst(segmentor, bbimgs)
         masks_p = utils.preprocess_masks(masks, bbimgs)
 
-        # checking masks
-        # color_mask = np.array(mmcv.color_val('green')[::-1], dtype=np.uint8)
-        # for m in masks_p:
-        #     idx = m[0]
-        #     mask = m[1]
-        #     crop = bbimgs[idx]
-        #     crop[mask] = crop[mask] * 0.5 + color_mask * 0.5
-
         for m in masks_p:
             idx = m[0]
             mask = m[1]
@@ -247,19 +239,17 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
             node._hist = tools.calc_RGB_histogram(bbimgs[i], node._mask)
 
         input_data[image_name] = node_lst
-        
-        # if fnum == 16:
-        #     print ('dumping appearance image')
-        #     debug.validate_hist_mask_bhattacharyya(node_lst, frame)
 
     print ('-> %d images have been read & processed' % (len(input_data)))
 
     return input_data, transform, size, parity, wc_d, last_frame
 
-def write_output_data(log_filename, track_hypot, path2det, data, iend, frame_offset, iid, parity):
+def write_output_data(log_filename, track_hypot, path2det, data, iend, frame_offset, iid, parity, draw_mask=True):
     # write to file
     log_file = open(log_filename, 'w')
-    log_file_mask = open('./masks.txt', 'w')
+
+    if draw_mask:
+        log_file_mask = open('./masks.txt', 'w')
 
     f = 1
     all_lines = []
@@ -274,15 +264,16 @@ def write_output_data(log_filename, track_hypot, path2det, data, iend, frame_off
                         bi = int(t[1])
                         b = data[t[0]][bi]._bb
                         s = data[t[0]][bi]._status
-                        wc = data[t[0]][bi]._3dc
 
-                        if wc[0] == 0. and wc[1] == 0.: # interpolated in tracklet matching
-                            mask = [[]]
+                        if draw_mask:
+                            wc = data[t[0]][bi]._3dc
+                            if wc[0] == 0. and wc[1] == 0.: # interpolated in tracklet matching
+                                mask = [[]]
+                            else:
+                                mask = data[t[0]][bi]._mask.astype(np.uint8).tolist()
+                            lines.append([f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], s, mask])
                         else:
-                            mask = data[t[0]][bi]._mask.astype(np.uint8).tolist()
-
-                        lines.append([f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], s, mask])
-                        
+                            lines.append([f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], s])
 
         all_lines.append(lines)
         f = f+2
@@ -301,21 +292,25 @@ def write_output_data(log_filename, track_hypot, path2det, data, iend, frame_off
 
             for l in fl:
                 log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
-                log_file_mask.write(str(l[7])+'\n')
+                if draw_mask:
+                    log_file_mask.write(str(l[7])+'\n')
 
             for l in al:
                 log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
-                log_file_mask.write(str(l[7])+'\n')
+                if draw_mask:
+                    log_file_mask.write(str(l[7])+'\n')
         
         # last index
         li = len(all_lines)-1
         for l in all_lines[li]:
             log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
-            log_file_mask.write(str(l[7])+'\n')
+            if draw_mask:
+                log_file_mask.write(str(l[7])+'\n')
 
         for l in all_lines[li]:
             log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0]+1, l[1], l[2], l[3], l[4], l[5], l[6]))
-            log_file_mask.write(str(l[7])+'\n')
+            if draw_mask:
+                log_file_mask.write(str(l[7])+'\n')
 
     else:
         for i in range(len(all_lines)-1):
@@ -331,19 +326,20 @@ def write_output_data(log_filename, track_hypot, path2det, data, iend, frame_off
 
             for l in fl:
                 log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
-                log_file_mask.write(str(l[7])+'\n')
+                if draw_mask:
+                    log_file_mask.write(str(l[7])+'\n')
 
             for l in al:
                 log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
-                log_file_mask.write(str(l[7])+'\n')
+                if draw_mask:
+                    log_file_mask.write(str(l[7])+'\n')
 
         # write last line
         li = len(all_lines)-1
         for l in all_lines[li]:
             log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
-            log_file_mask.write(str(l[7])+'\n')
-
-
+            if draw_mask:
+                log_file_mask.write(str(l[7])+'\n')
 
 def extract_patch_block(patch):
     h, w = patch.shape[0], patch.shape[1]
