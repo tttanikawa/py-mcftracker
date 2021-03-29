@@ -1,13 +1,10 @@
 import tools
 from scipy.optimize import linear_sum_assignment
 import numpy as np
-import mmcv
 
 import sys
 
 import torch
-from pfe.torchreid.utils import FeatureExtractor
-from pfe.scripts.extract_fetures import network_feed_from_list
 
 from bepy.transform import Transform
 from bepy.models import MatchVideo
@@ -29,9 +26,8 @@ from scipy import interpolate
 from bbox import Box
 
 sys.path.append("../")
-from mmdetection.demo.inference_demo import init_segmentor, get_masks_from_image_lst
+from maskrcnn_mmdet.demo.inference_mask import init_segmentor, get_masks_from_image_lst
 
-sys.path.append("../mmdetection/")
 import mmcv
 
 def isGoalArea(transform, xwc, size=None, frame=None):

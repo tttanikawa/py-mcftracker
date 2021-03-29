@@ -2,7 +2,6 @@ import tools
 import cv2
 from scipy.ndimage import rotate
 import numpy as np
-import mmcv
 from random import randrange
 from scipy.spatial import distance
 import operator
@@ -11,6 +10,8 @@ import matplotlib.pyplot as plt
 import helper
 
 import ast
+
+import mmcv
 
 def get_patch_by_id(tracker, track_num, detections, images, features):
     # get hypothesis file
