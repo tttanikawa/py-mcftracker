@@ -127,7 +127,6 @@ def convert2world_post(rows, size, transform):
     return wc
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
-                        ckpt_path='/root/py-mcftracker/pfe/checkpoints/market_combined_120e.pth',
                         min_confidence=0.3, max_iou=0.98):
     
     input_data = {}
