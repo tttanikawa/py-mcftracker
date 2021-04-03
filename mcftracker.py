@@ -39,6 +39,11 @@ class MinCostFlowTracker:
         self._node2id = tools.map_node2id(data)
         
         self._fib_cache = {0: 0, 1: 1}
+        
+        self._npast = 35
+
+        self._penalty_skp = 5
+        self._penalty_en = 100
 
     def _fib(self, n):
         if n in self._fib_cache:
@@ -122,7 +127,7 @@ class MinCostFlowTracker:
 
         return -math.log(prob)
     
-    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.2, c=0.30):
+    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.5, c=0.30):
         u = prev_node._hist
         v = cur_node._hist
 
@@ -149,23 +154,33 @@ class MinCostFlowTracker:
             if n % 200 == 0:
                 print ('-> processing image %s / %s' % (image_name, last_img_name))
 
-            for i, node in enumerate(node_lst):
-                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_factor))
-                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "u")], self._node2id[(image_name, i, "v")], 1, int(self._calc_cost_detection(1.0-node._score) * f2i_factor))
-                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "v")], self._node2id["sink"], 1, int(self._calc_cost_exit() * f2i_factor))
-
             frame_id = self._name2id[image_name]
-            
-            if frame_id == 0:
-                continue
 
-            prev_image_name = self._id2name[frame_id - 1]
+            for i, node in enumerate(node_lst):
+                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_factor*self._penalty_en))
+                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "u")], self._node2id[(image_name, i, "v")], 1, int(self._calc_cost_detection(1.0-node._score)*f2i_factor))
+                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "v")], self._node2id["sink"], 1, int(self._calc_cost_exit() * f2i_factor*self._penalty_en))
             
-            for i, i_node in enumerate(self._data[prev_image_name]):
-                for j, j_node in enumerate(node_lst):
-                    unit_cost = self._calc_cost_link_appearance(i_node, j_node, transform, size)
-                    if unit_cost >= 0.:
-                        self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_image_name, i, "v")], self._node2id[(image_name, j, "u")], 1, int(unit_cost*1000))
+            if frame_id > 0:
+                prev_image_name = self._id2name[frame_id - 1]
+                
+                for i, i_node in enumerate(self._data[prev_image_name]):
+                    for j, j_node in enumerate(node_lst):
+                        unit_cost = self._calc_cost_link_appearance(i_node, j_node, transform, size)
+                        if unit_cost >= 0.:
+                            self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_image_name, i, "v")], self._node2id[(image_name, j, "u")], 1, int(unit_cost*1000))
+
+
+                # connect N previous frames to current frame's nodes
+                if frame_id >= self._npast:
+                    
+                    for step in range(self._npast, 1, -1):
+                        fpast = self._id2name[frame_id-step]
+                        for i, i_node in enumerate(self._data[fpast]):
+                            for j, j_node in enumerate(node_lst):
+                                unit_cost = self._calc_cost_link_appearance(i_node, j_node, transform, size)
+                                if unit_cost >= 0.:
+                                    self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(fpast, i, "v")], self._node2id[(image_name, j, "u")], 1, int(unit_cost*1000*self._penalty_skp))
 
         return                
 

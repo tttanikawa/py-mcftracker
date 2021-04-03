@@ -45,11 +45,12 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     print("Optimal number of flow: {}".format(optimal_flow))
     print("Optimal cost: {}".format(optimal_cost))
 
-    track_hypot, nt, nh, nht = helper.build_hypothesis_lst(tracker.flow_dict, "1", lf_i)
+    # track_hypot, nt, nh, nht = helper.build_hypothesis_lst(tracker.flow_dict, "1", lf_i)
+    tracks, _, _, _ = helper.build_hypothesis_lst(tracker.flow_dict, "1", lf_i)
     out_file = './hypothesis.txt'
     out_video = './out.avi'
     
-    tracks = tracklet_matching.cost_flow_tracklet(track_hypot, nh, nt, nht, data, transform)
+    # tracks = tracklet_matching.cost_flow_tracklet(track_hypot, nh, nt, nht, data, transform)
     helper.write_output_data(out_file, tracks, path2det, data, len(data)+1, frame_offset, iid, parity, draw_mask=False)
     debug.visualise_tracks(out_file, path2video, slice_start, slice_end, _wc, transform, size, out_video, draw_mask=False)
 
