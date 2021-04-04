@@ -54,6 +54,8 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     helper.write_output_data(out_file, tracks, path2det, data, len(data)+1, frame_offset, iid, parity, draw_mask=False)
     debug.visualise_tracks(out_file, path2video, slice_start, slice_end, _wc, transform, size, out_video, draw_mask=False)
 
+    return
+
 if __name__ == "__main__":
     path2video = sys.argv[1]
     print ('# argv 1 -> path to video file: %s' % (path2video))

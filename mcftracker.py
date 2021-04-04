@@ -40,9 +40,8 @@ class MinCostFlowTracker:
         
         self._fib_cache = {0: 0, 1: 1}
         
-        self._npast = 35
-
-        self._penalty_skp = 5
+        self._npast = 70
+        self._penalty_skp = 50
         self._penalty_en = 100
 
     def _fib(self, n):
@@ -142,6 +141,9 @@ class MinCostFlowTracker:
         if dst_eucl >= dst_max:
             return -1
 
+        if prob_color <= 0.35:
+            return -1
+
         prob_dst = np.float32(1.0 - dst_eucl / dst_max)
         prob_sim = c*prob_dst + (1.0-c)*prob_color
 
@@ -157,9 +159,9 @@ class MinCostFlowTracker:
             frame_id = self._name2id[image_name]
 
             for i, node in enumerate(node_lst):
-                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_factor*self._penalty_en))
+                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_factor * self._penalty_en))
                 self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "u")], self._node2id[(image_name, i, "v")], 1, int(self._calc_cost_detection(1.0-node._score)*f2i_factor))
-                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "v")], self._node2id["sink"], 1, int(self._calc_cost_exit() * f2i_factor*self._penalty_en))
+                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "v")], self._node2id["sink"], 1, int(self._calc_cost_exit() * f2i_factor * self._penalty_en))
             
             if frame_id > 0:
                 prev_image_name = self._id2name[frame_id - 1]
@@ -169,7 +171,6 @@ class MinCostFlowTracker:
                         unit_cost = self._calc_cost_link_appearance(i_node, j_node, transform, size)
                         if unit_cost >= 0.:
                             self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_image_name, i, "v")], self._node2id[(image_name, j, "u")], 1, int(unit_cost*1000))
-
 
                 # connect N previous frames to current frame's nodes
                 if frame_id >= self._npast:
