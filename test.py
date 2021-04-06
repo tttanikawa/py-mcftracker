@@ -48,6 +48,7 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     print("Optimal cost: {}".format(optimal_cost))
 
     tracks, _, _, _ = helper.build_hypothesis_lst(tracker.flow_dict, "1", lf_i)
+    helper.interpolate_gap(tracks, data)
     helper.write_output_data(out_file, tracks, path2det, data, len(data)+1, frame_offset, iid, parity, draw_mask=False)
 
     if write_video:    

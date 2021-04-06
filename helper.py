@@ -502,3 +502,63 @@ def remove_compex_scene_id_grid(file_in, file_out, transform, size):
                 tid, x1, y1, w, h, s = int(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5]), int(r[9])
                 # write new result
                 log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (frame_idx, tid, x1, y1, w, h, s))
+
+
+def interpolate_gap(tracks, data):
+    
+    for j,track in enumerate(tracks):
+        # track -> [('1', 24, 'u'), ... ]
+        new_track = []
+
+        new_track.append(track[0])
+        new_track.append(track[1])
+
+        for i in range(2, len(track), 2):
+            tpre = track[i-2]
+            tcur = track[i]
+
+            new_track.append(track[i])
+            new_track.append(track[i+1])
+
+            fpre = int(tpre[0])
+            fcur = int(tcur[0])
+
+            if (fcur-fpre)>1 and (fcur-fpre)<=20:
+                bs = data[tpre[0]][tpre[1]]._bb
+                be = data[tcur[0]][tcur[1]]._bb
+
+                # print ('%d -> %d > %s -> %s' % (fpre,fcur,bs,be))
+
+                fpx1 = [bs[0], be[0]]
+                fpy1 = [bs[1], be[1]]
+                fpx2 = [bs[2], be[2]]
+                fpy2 = [bs[3], be[3]]
+
+                xp = [fpre, fcur]
+
+                for x in range(fpre+1, fcur):
+                    pix1 = np.interp(x, xp, fpx1)
+                    piy1 = np.interp(x, xp, fpy1)
+                    pix2 = np.interp(x, xp, fpx2)
+                    piy2 = np.interp(x, xp, fpy2)
+
+                    # print ('%d -> %s' % (x, [pix1,piy1,pix2,piy2]))
+                    pi = [pix1,piy1,pix2,piy2]
+
+                    gn = GraphNode([0.,0.], pi, 0., 0)
+                    fn = str(x)
+
+                    index = len(data[fn])
+                    data[fn].append(gn)
+
+                    node_u = (fn, index, "u")
+                    node_v = (fn, index, "v")
+
+                    new_track.append(node_u)
+                    new_track.append(node_v)
+
+        # sort new_track by fn
+        new_track_s = sorted(new_track, key=lambda x: int(x[0]))
+        # assign new_track
+        tracks[j] = new_track_s
+        
