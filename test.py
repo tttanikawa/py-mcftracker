@@ -12,7 +12,9 @@ import tracklet_matching
 
 import os
 
-def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_id):
+def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_id, 
+                                    out_file='./hypothesis.txt', write_video=False):
+
     print ('# starting to read input frames & detection data')
 
     if os.path.exists("./hypothesis.txt"):
@@ -38,21 +40,19 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
     tracker.build_network(str(len(data)), transform, size)
 
     print ('-> finish building min cost flow graph')
-    optimal_flow, optimal_cost = tracker.run(25, 300, fib=False)
+    optimal_flow, optimal_cost = tracker.run(24, 40, fib=False)
     end = time.time()
 
     print("Finished: {} sec".format(end - start))
     print("Optimal number of flow: {}".format(optimal_flow))
     print("Optimal cost: {}".format(optimal_cost))
 
-    # track_hypot, nt, nh, nht = helper.build_hypothesis_lst(tracker.flow_dict, "1", lf_i)
     tracks, _, _, _ = helper.build_hypothesis_lst(tracker.flow_dict, "1", lf_i)
-    out_file = './hypothesis.txt'
-    out_video = './out.avi'
-    
-    # tracks = tracklet_matching.cost_flow_tracklet(track_hypot, nh, nt, nht, data, transform)
     helper.write_output_data(out_file, tracks, path2det, data, len(data)+1, frame_offset, iid, parity, draw_mask=False)
-    debug.visualise_tracks(out_file, path2video, slice_start, slice_end, _wc, transform, size, out_video, draw_mask=False)
+
+    if write_video:    
+        out_video = './out.avi'
+        debug.visualise_tracks(out_file, path2video, slice_start, slice_end, _wc, transform, size, out_video, draw_mask=False)
 
     return
 

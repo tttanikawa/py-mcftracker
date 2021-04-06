@@ -302,8 +302,6 @@ class MinCostFlowTracker:
                 cost = self.mcf.OptimalCost()
             else:
                 continue
-                # print("There was an issue with the min cost flow input.")
-                # sys.exit()
 
             if cost < optimal_cost:
                 optimal_flow = flow
