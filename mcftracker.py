@@ -83,49 +83,6 @@ class MinCostFlowTracker:
         else:
             return 10000
     
-    def _calc_cost_tracklet(self, prev_node, cur_node, transform, max_gap=80, c=0.40):
-        # last frame index of prev_node
-        # first frame index of cur_node
-        lfPn = prev_node._efIdx
-        ffCn = cur_node._sfIdx
-
-        # wc of end of prev_node
-        # wc of start of cur_node
-        wcEPn = prev_node._e3dc
-        wcSCn = cur_node._s3dc
-
-        # difference in frame index
-        fdiff = ffCn - lfPn
-        
-        if fdiff < 0 or fdiff >= max_gap:
-            return -1
-
-        maxDist = self._return_max_dist(fdiff)
-
-        # euclidian diff of wc
-        cx, cy = wcSCn[0], wcSCn[1] 
-        rx, ry = wcEPn[0], wcEPn[1]
-
-        cx = cx * transform.parameter.get("ground_width")
-        cy = cy * transform.parameter.get("ground_height")
-        rx = rx * transform.parameter.get("ground_width")
-        ry = ry * transform.parameter.get("ground_height")
-
-        dst = distance.euclidean((cx,cy), (rx,ry))
-
-        if dst >= maxDist:
-            return -1
-
-        # normalise dist
-        # normalise frame diff
-        dist_n = dst / maxDist
-        fdiff_n = fdiff / max_gap
-
-        # prob = c*(1.0-dist_n) + (1.0-c)*(1.0-fdiff_n)
-        prob = 1.0-dist_n
-
-        return -math.log(prob)
-    
     def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.5, c=0.30):
         u = prev_node._hist
         v = cur_node._hist
@@ -184,47 +141,6 @@ class MinCostFlowTracker:
                                     self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(fpast, i, "v")], self._node2id[(image_name, j, "u")], 1, int(unit_cost*1000*self._penalty_skp))
 
         return                
-
-    def build_network_tracklet(self, transform, f2i_factor=10000):
-        self.mcf = pywrapgraph.SimpleMinCostFlow()
-
-        for ttype, node_lst in sorted(self._data.items(), key=lambda t: tools.get_key(t[0])):
-            tp = self._name2id[ttype]
-
-            for i, _ in enumerate(node_lst):
-                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(ttype, i, "u")], 1, int(self._calc_cost_enter() * f2i_factor))
-                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(ttype, i, "u")], self._node2id[(ttype, i, "v")], 1, int(self._calc_cost_detection(1.0-0.99) * f2i_factor))
-                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(ttype, i, "v")], self._node2id["sink"], 1, int(self._calc_cost_exit() * f2i_factor))
-
-            if tp != 0:
-                prev_type = self._id2name[tp-1]
-                for i, i_node in enumerate(self._data[prev_type]):
-                    for j, j_node in enumerate(node_lst):
-                        cost = self._calc_cost_tracklet(i_node, j_node, transform)
-                        if cost >= 0.:
-                            self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_type, i, "v")], self._node2id[(ttype, j, "u")], 1, int(cost*1000))
-
-            else:
-                cur_type = self._id2name[tp]
-                nex_type = self._id2name[tp+2]
-                for i, i_node in enumerate(self._data[cur_type]):
-                    for j, j_node in enumerate(self._data[nex_type]):
-                        cost = self._calc_cost_tracklet(i_node, j_node, transform)
-                        if cost >= 0.:
-                            self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(cur_type, i, "v")], self._node2id[(nex_type, j, "u")], 1, int(cost*1000))
-
-            if tp == 1:
-                # connection betweem nodes in nht (no-head-tail)
-                tnht = self._id2name[tp]
-                nlst = self._data[tnht]
-
-                for i in range(len(nlst)-1):
-                    for j in range(i+1, len(nlst)):
-                        cost = self._calc_cost_tracklet(nlst[i], nlst[j], transform)
-                        if cost >= 0.:
-                            self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(tnht, i, "v")], self._node2id[(tnht, j, "u")], 1, int(cost*1000))
-
-        return
 
     def _make_flow_dict(self):
         self.flow_dict = {}
