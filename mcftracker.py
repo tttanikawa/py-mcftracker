@@ -15,7 +15,6 @@ import numpy as np
 
 from sklearn.metrics.pairwise import cosine_similarity
 import helper
-from scipy.spatial import distance
 
 class MinCostFlowTracker:
     """
@@ -40,9 +39,9 @@ class MinCostFlowTracker:
         
         self._fib_cache = {0: 0, 1: 1}
         
-        self._npast = 70
-        self._penalty_skp = 50
-        self._penalty_en = 100
+        self._npast = 60
+        self._penalty_skp = 5
+        self._penalty_en = 50
 
     def _fib(self, n):
         if n in self._fib_cache:
@@ -83,7 +82,7 @@ class MinCostFlowTracker:
         else:
             return 10000
     
-    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.5, c=0.30):
+    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.4):
         u = prev_node._hist
         v = cur_node._hist
 
@@ -93,16 +92,26 @@ class MinCostFlowTracker:
         b = np.array(cxy)
 
         prob_color = 1.0-tools.calc_bhattacharyya_distance(u, v)
+
+        if prob_color <= 0.350:
+            return -1
+
         dst_eucl = np.linalg.norm(a-b)
+        prob_dst = np.float32(1.0 - dst_eucl / dst_max)
 
         if dst_eucl >= dst_max:
             return -1
 
-        if prob_color <= 0.35:
-            return -1
+        bu = prev_node._bb
+        bv = cur_node._bb
+        prob_iou = tools.calc_overlap(bu,bv)
 
-        prob_dst = np.float32(1.0 - dst_eucl / dst_max)
-        prob_sim = c*prob_dst + (1.0-c)*prob_color
+        if prob_iou != 0.:
+            c1, c2, c3 = 0.20, 0.6, 0.20
+            prob_sim = c1*prob_dst + c2*prob_color + c3*prob_iou
+        else:
+            c1, c2, c3 = 0.3, 0.7, 0.0
+            prob_sim = c1*prob_dst + c2*prob_color + c3*prob_iou
 
         return -math.log(prob_sim)
 
@@ -110,7 +119,7 @@ class MinCostFlowTracker:
         self.mcf = pywrapgraph.SimpleMinCostFlow()
 
         for n, (image_name, node_lst) in enumerate(sorted(self._data.items(), key=lambda t: tools.get_key(t[0]))):
-            if n % 200 == 0:
+            if n % 100 == 0:
                 print ('-> processing image %s / %s' % (image_name, last_img_name))
 
             frame_id = self._name2id[image_name]
