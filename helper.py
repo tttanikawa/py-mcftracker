@@ -127,7 +127,7 @@ def convert2world_post(rows, size, transform):
     return wc
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
-                        min_confidence=0.3, max_iou=0.98):
+                        min_confidence=0.4, max_iou=0.98):
     
     input_data = {}
     video = mmcv.VideoReader(path2video)
