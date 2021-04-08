@@ -123,7 +123,7 @@ class MinCostFlowTracker:
 
             frame_id = self._name2id[image_name]
 
-            pnlty_en = 10 if frame_id == 0 else 100
+            pnlty_en = 1 if frame_id == 0 else 100
             
             for i, node in enumerate(node_lst):
                 self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_factor * pnlty_en))
@@ -140,10 +140,10 @@ class MinCostFlowTracker:
                             self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_image_name, i, "v")], self._node2id[(image_name, j, "u")], 1, int(unit_cost*1000))
 
                 # connect N previous frames to current frame's nodes
-                # if frame_id >= self._npast and frame_id < (self._name2id[last_img_name]-self._npast):
-                if frame_id >= self._npast:
-                    
-                    for step in range(self._npast, 1, -1):
+                if frame_id >= 2:
+                    npast = self._npast if frame_id >= self._npast else frame_id
+
+                    for step in range(npast, 1, -1):
                         fpast = self._id2name[frame_id-step]
                         for i, i_node in enumerate(self._data[fpast]):
                             for j, j_node in enumerate(node_lst):
@@ -151,7 +151,7 @@ class MinCostFlowTracker:
                                 if unit_cost >= 0.:
                                     self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(fpast, i, "v")], self._node2id[(image_name, j, "u")], 1, int(unit_cost*1000*self._penalty_skp))
 
-        return                
+        return
 
     def _make_flow_dict(self):
         self.flow_dict = {}
