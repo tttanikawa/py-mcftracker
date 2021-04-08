@@ -40,8 +40,7 @@ class MinCostFlowTracker:
         self._fib_cache = {0: 0, 1: 1}
         
         self._npast = 60
-        self._penalty_skp = 5
-        self._penalty_en = 50
+        self._penalty_skp = 10
 
     def _fib(self, n):
         if n in self._fib_cache:
@@ -107,10 +106,10 @@ class MinCostFlowTracker:
         prob_iou = tools.calc_overlap(bu,bv)
 
         if prob_iou != 0.:
-            c1, c2, c3 = 0.20, 0.6, 0.20
+            c1, c2, c3 = 0.20, 0.60, 0.20
             prob_sim = c1*prob_dst + c2*prob_color + c3*prob_iou
         else:
-            c1, c2, c3 = 0.3, 0.7, 0.0
+            c1, c2, c3 = 0.2, 0.8, 0.0
             prob_sim = c1*prob_dst + c2*prob_color + c3*prob_iou
 
         return -math.log(prob_sim)
@@ -124,10 +123,12 @@ class MinCostFlowTracker:
 
             frame_id = self._name2id[image_name]
 
+            pnlty_en = 10 if frame_id == 0 else 100
+            
             for i, node in enumerate(node_lst):
-                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_factor * self._penalty_en))
+                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_factor * pnlty_en))
                 self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "u")], self._node2id[(image_name, i, "v")], 1, int(self._calc_cost_detection(1.0-node._score)*f2i_factor))
-                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "v")], self._node2id["sink"], 1, int(self._calc_cost_exit() * f2i_factor * self._penalty_en))
+                self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(image_name, i, "v")], self._node2id["sink"], 1, int(self._calc_cost_exit() * f2i_factor * pnlty_en))
             
             if frame_id > 0:
                 prev_image_name = self._id2name[frame_id - 1]
@@ -139,6 +140,7 @@ class MinCostFlowTracker:
                             self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_image_name, i, "v")], self._node2id[(image_name, j, "u")], 1, int(unit_cost*1000))
 
                 # connect N previous frames to current frame's nodes
+                # if frame_id >= self._npast and frame_id < (self._name2id[last_img_name]-self._npast):
                 if frame_id >= self._npast:
                     
                     for step in range(self._npast, 1, -1):
