@@ -30,6 +30,9 @@ from maskrcnn_mmdet.demo.inference_mask import init_segmentor, get_masks_from_im
 
 import mmcv
 
+import KalmanFilter
+from Track import OnlineTrack
+
 def isGoalArea(transform, xwc, size=None, frame=None):
 
     gp = [[0, 54.16, 0], [16.5, 54.16, 0], [0, 13.84, 0], [16.5, 13.84, 0],
@@ -52,12 +55,6 @@ def isGoalArea(transform, xwc, size=None, frame=None):
         return True
 
     return False
-
-def box2midpoint_normalised(box, iw, ih):
-    w = box[2]-box[0]
-    x, y = box[0] + w/2, box[3]
-    # print (x,y,iw,ih)
-    return (x/iw, y/ih)
 
 def is_box_occluded(tlbr, boxes, t_iou=1.0):
     # calculate iou with all boxes in current frame
@@ -560,5 +557,4 @@ def interpolate_gap(tracks, data):
         # sort new_track by fn
         new_track_s = sorted(new_track, key=lambda x: int(x[0]))
         # assign new_track
-        tracks[j] = new_track_s
-        
+        tracks[j] = new_track_s    
