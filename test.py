@@ -13,7 +13,7 @@ import tracklet_matching
 import os
 
 def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_id, 
-                                    out_file='./hypothesis.txt', write_video=False):
+                                    out_file='./hypothesis.txt', write_video=True):
 
     print ('# starting to read input frames & detection data')
 
@@ -29,6 +29,14 @@ def run_mfct(path2video, path2det, frame_offset, frame_count, iid, match_video_i
 
     slice_start = 0 if frame_offset == 0 else frame_offset-1
     slice_end = min(frame_offset+frame_count, frame_offset+max_frame_idx)
+
+    _wc, transform, size = helper._test_tracker_online(path2det, path2video, slice_start, slice_end, 
+                                    det_in, frame_indices, match_video_id, out_file)
+
+    out_video = './out.avi'
+    debug.visualise_tracks(out_file, path2video, slice_start, slice_end, _wc, transform, size, out_video, draw_mask=False)
+
+    return
 
     data, transform, size, parity, _wc, lf_i = helper.read_input_data(
         path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id)

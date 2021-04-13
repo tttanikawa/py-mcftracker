@@ -11,19 +11,18 @@ class OnlineTracker:
         self._next_id = 1
 
     def onlineTrackerInit(self, boxes_init):
+
         for box in boxes_init:
             new_kf = KalmanFilter.KalmanFilter()
             mean, cov = new_kf.initiate(np.asarray(box.to_world()))
-            
             self.tracks.append(OnlineTrack(self._next_id, mean, cov, new_kf))
             self._next_id += 1
 
-    def onlineTrackerAssign(self, measurements, thresh=5.9915, inf=1e6):
-        """
-            tracks.predict - new_measurements
-            cost_matrix
-            linear_assignment
-        """
+        print ('%d tracks created' % (len(self.tracks)))
+
+        return
+
+    def onlineTrackerAssign(self, measurements, thresh=3.8415, inf=1000000):
 
         for track in self.tracks:
             track.predict() # updates track.mean and track.covariance
@@ -32,22 +31,36 @@ class OnlineTracker:
 
         for i, track in enumerate(self.tracks):
             for j, box in enumerate(measurements):
-                dist = track.kf.gating_distance(track.mean, track.covariance, box)
-                cost_matrix[i][j] = dist if dist <= thresh else inf
+                cost_matrix[i][j] = track.kf.gating_distance(track.mean, 
+                                        track.covariance, box.to_world())
 
         row_indices, col_indices = linear_sum_assignment(cost_matrix)
         
         matches = []
+        unmatched_tracks = []
+        unmatched_dets = []
+
         for row, col in zip(row_indices, col_indices):
-            track_idx = self.tracks[row]
-            detection_idx = measurements[col]
-            matches.append((track_idx, detection_idx))
+            if cost_matrix[row][col] >= thresh:
+                unmatched_tracks.append(row)
+                unmatched_dets.append(col)
+            else:
+                matches.append((row, col))
 
-        return matches
+        for i, _ in enumerate(self.tracks):
+            if i not in row_indices:
+                unmatched_tracks.append(i)
 
-    def onlineTrackerUpdate(measurement):
+        for j, _ in enumerate(measurements):
+            if j not in col_indices:
+                unmatched_dets.append(j)
+
+        return matches, unmatched_tracks, unmatched_dets
+
+    def onlineTrackerUpdate(self, matches, measurements):
         """
             tracks.update - new_measurements
         """
-
-        return
+        
+        for match in matches:
+            self.tracks[match[0]].update(measurements[match[1]].to_world())

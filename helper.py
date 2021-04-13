@@ -31,7 +31,7 @@ from maskrcnn_mmdet.demo.inference_mask import init_segmentor, get_masks_from_im
 import mmcv
 
 import KalmanFilter
-from Track import OnlineTrack
+from Tracker import OnlineTracker
 
 def isGoalArea(transform, xwc, size=None, frame=None):
 
@@ -102,26 +102,97 @@ def find_prev_imgbox(transform, box_cur, detections, images, name, frame, bi):
     patch = copy.deepcopy(images[prev_index][min_dist_index])
     return True, patch
 
-def convert2world(rows, size, transform):
-    wc = []
-    for n,r in enumerate(rows):
-        _, x1, y1, x2, y2, s = int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])
-        cb = [x1,y1,x2,y2,s]
-        p = box2midpoint_normalised(cb, size[1], size[0])
-        cx, cy = transform.video_to_ground(p[0], p[1])
-        # print (cx,cy)
-        wc.append((cx,cy))
-    return wc
+def _test_tracker_online(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id, 
+                    out_file, min_confidence=0.4, max_iou=0.98):
 
-def convert2world_post(rows, size, transform):
-    wc = []
-    for n,r in enumerate(rows):
-        _, x1, y1, w, h, _ = int(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5]), int(r[9])
-        cb = [x1,y1,x1+w,y1+h]
-        p = box2midpoint_normalised(cb, size[1], size[0])
-        cx, cy = transform.video_to_ground(p[0], p[1])
-        wc.append((cx,cy))
-    return wc
+    video = mmcv.VideoReader(path2video)
+    match_video = MatchVideo.load(match_video_id)
+
+    transform = Transform(
+        match_video.video.camera_recording["parameter"],
+        match_video.video.camera_recording["extrinsic_json"],
+        match_video.video.camera_recording["stitching_json"],
+    )
+
+    parity = False
+
+    if slice_start %2 != 0 and (slice_end-1) % 2 != 0: # odd - odd
+        parity = True
+    elif slice_start %2 == 0 and (slice_end-1) % 2 == 0: # even - even
+        parity = True
+    
+    tracker = OnlineTracker()
+
+    fnum = 0
+    all_lines = []
+    for index in range(slice_start, slice_end):
+        frame = video[index]
+
+        if index == slice_start:
+            size = frame.shape
+            cv2.imwrite("./frame.jpg", frame)
+
+        # skip frame
+        # note: if index of last frame in chunk is even, throw away odd indexes and vice versa
+        # frame of last index is needed for inter-chunk connection
+        if parity:
+            if (index-slice_start) % 2 != 0:
+                continue
+        else:
+            # instead of skipping 0 index skip 1 index
+            if (index-slice_start) != 0 and (index-slice_start) % 2 == 0:
+                continue
+            if (index-slice_start) == 1:
+                continue
+
+        fnum = fnum+1
+
+        if fnum % 10 == 0:
+            print ('-> reading frame %d / %d' % (fnum, slice_end-slice_start))
+
+        mask = frame_indices == (index - slice_start + 1)
+        rows = det_in[mask]
+
+        boxes = []
+
+        for _,r in enumerate(rows):
+            _, x1, y1, x2, y2, s = int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])
+            boxes.append(Box([x1,y1,x2,y2], s, transform, size))
+
+        boxes = [b for b in boxes if b.confidence >= min_confidence]
+
+        # Run non-maxima suppression.
+        blst = np.array([b.to_tlwh() for b in boxes])
+        scrlst = np.array([b.confidence for b in boxes])
+        indices = utils.non_max_suppression(blst, max_iou, scrlst)
+        boxes_nms = [boxes[i] for i in indices]
+
+        if fnum == 1:
+            tracker.onlineTrackerInit(boxes_nms)
+            continue
+ 
+        matches, unmatched_track_ids, unmatched_det_ids = tracker.onlineTrackerAssign(boxes_nms)
+
+        for t in unmatched_track_ids:
+            print ('[%d] unmatched track idx %d'%(index-slice_start+1, t))
+
+        for d in unmatched_det_ids:
+            print ('[%d] unmatched det idx %d'%(index-slice_start+1, d))
+
+        lines = []
+        for match in matches:
+            tidx, didx = match[0], match[1]
+            box, track = boxes_nms[didx], tracker.tracks[tidx]
+            l = [index-slice_start+1, track.id, box.tlbr[0], box.tlbr[1], box.tlbr[2]-box.tlbr[0], box.tlbr[3]-box.tlbr[1], 0.99]
+            lines.append(l)
+
+        all_lines.append(lines)
+
+        tracker.onlineTrackerUpdate(matches, boxes_nms)
+
+    interpolate_lines(out_file, all_lines, parity)
+    
+    return [], transform, size
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
                         min_confidence=0.4, max_iou=0.98):
@@ -151,8 +222,8 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
         parity = True
     
     last_frame = ""
-
     wc_d = {}
+
     for index in range(slice_start, slice_end):
         frame = video[index]
 
@@ -191,7 +262,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
         for n,r in enumerate(rows):
             _, x1, y1, x2, y2, s = int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])
-            boxes.append(Box([x1,y1,x2,y2], s))
+            boxes.append(Box([x1,y1,x2,y2], s, transform, size))
 
         boxes = [b for b in boxes if b.confidence >= min_confidence]
 
@@ -203,12 +274,11 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
         for box in boxes_nms:
             imgbox = frame[int(box.tlbr[1]):int(box.tlbr[3]), int(box.tlbr[0]):int(box.tlbr[2]), :]
-            p = box2midpoint_normalised(box.tlbr, size[1], size[0])
-            cx, cy = transform.video_to_ground(p[0], p[1])
-            _wc.append((cx,cy))
+            p = box.to_world()
+            _wc.append(p)
 
             mskt_ = np.full((imgbox.shape[0],imgbox.shape[1]), True, dtype=bool)
-            node = GraphNode((cx,cy), box.tlbr, box.confidence, 0, mask=mskt_)
+            node = GraphNode(p, box.tlbr, box.confidence, 0, mask=mskt_)
 
             bbimgs.append(imgbox)
             node_lst.append(node)
@@ -236,39 +306,12 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
 
     return input_data, transform, size, parity, wc_d, last_frame
 
-def write_output_data(log_filename, track_hypot, path2det, data, iend, frame_offset, iid, parity, draw_mask=True):
+def interpolate_lines(log_filename, all_lines, parity, draw_mask=False):
     # write to file
     log_file = open(log_filename, 'w')
 
     if draw_mask:
         log_file_mask = open('./masks.txt', 'w')
-
-    f = 1
-    all_lines = []
-
-    for n in range(1, iend):
-        lines = []
-        for id, track in enumerate(track_hypot):
-            for i, t in enumerate(track):
-                if i % 2 == 0:
-                    
-                    if int(t[0]) == n:
-                        bi = int(t[1])
-                        b = data[t[0]][bi]._bb
-                        s = data[t[0]][bi]._status
-
-                        if draw_mask:
-                            wc = data[t[0]][bi]._3dc
-                            if wc[0] == 0. and wc[1] == 0.: # interpolated in tracklet matching
-                                mask = [[]]
-                            else:
-                                mask = data[t[0]][bi]._mask.astype(np.uint8).tolist()
-                            lines.append([f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], s, mask])
-                        else:
-                            lines.append([f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], s])
-
-        all_lines.append(lines)
-        f = f+2
 
     if not parity:
         for i in range(len(all_lines)-1):
@@ -332,6 +375,41 @@ def write_output_data(log_filename, track_hypot, path2det, data, iend, frame_off
             log_file.write('%d, %d, %f, %f, %f, %f, 1,-1,-1, %d \n' % (l[0], l[1], l[2], l[3], l[4], l[5], l[6]))
             if draw_mask:
                 log_file_mask.write(str(l[7])+'\n')
+
+    return 
+
+def write_output_data(log_filename, track_hypot, path2det, data, iend, frame_offset, iid, parity, draw_mask=True):
+
+    f = 1
+    all_lines = []
+
+    for n in range(1, iend):
+        lines = []
+        for id, track in enumerate(track_hypot):
+            for i, t in enumerate(track):
+                if i % 2 == 0:
+                    
+                    if int(t[0]) == n:
+                        bi = int(t[1])
+                        b = data[t[0]][bi]._bb
+                        s = data[t[0]][bi]._status
+
+                        if draw_mask:
+                            wc = data[t[0]][bi]._3dc
+                            if wc[0] == 0. and wc[1] == 0.: # interpolated in tracklet matching
+                                mask = [[]]
+                            else:
+                                mask = data[t[0]][bi]._mask.astype(np.uint8).tolist()
+                            lines.append([f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], s, mask])
+                        else:
+                            lines.append([f, (iid-1)*10000+(id+1), b[0], b[1], b[2]-b[0], b[3]-b[1], s])
+
+        all_lines.append(lines)
+        f = f+2
+    
+    interpolate_lines(log_filename, all_lines, parity)
+
+    return
 
 def extract_patch_block(patch):
     h, w = patch.shape[0], patch.shape[1]

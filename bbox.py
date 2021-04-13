@@ -23,7 +23,8 @@ class Box(object):
     def to_world(self):
         p = self.box2midpoint_normalised(self.tlbr, self.size[1], self.size[0])
         cx, cy = self.transform.video_to_ground(p[0], p[1])
-        return (cx,cy)
+        cx, cy = cx*self.transform.parameter.get("ground_width"), cy*self.transform.parameter.get("ground_height")
+        return [cx,cy]
 
 
 

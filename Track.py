@@ -14,7 +14,7 @@ class OnlineTrack:
             updates corresponding Kalman Filter object's parameters & mean and covariance of the track
             detection - is a box in x,y,w,h format
         """
-        self.mean, self.covariance = self.kf.update(self.mean, self.covariance, detection.to_xyah())
+        self.mean, self.covariance = self.kf.update(self.mean, self.covariance, detection)
 
     def predict(self):
         """
