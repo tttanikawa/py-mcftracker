@@ -24,7 +24,7 @@ class Box(object):
         p = self.box2midpoint_normalised(self.tlbr, self.size[1], self.size[0])
         cx, cy = self.transform.video_to_ground(p[0], p[1])
         cx, cy = cx*self.transform.parameter.get("ground_width"), cy*self.transform.parameter.get("ground_height")
-        return [cx,cy]
+        return np.asarray([cx,cy], dtype=np.float)
 
 
 

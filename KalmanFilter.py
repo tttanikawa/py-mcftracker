@@ -14,8 +14,8 @@ class KalmanFilter(object):
 
         self._update_mat = np.eye(ndim, 2 * ndim)
 
-        self._std_position = 6.25
-        self._std_velocity = 4.
+        self._std_position = 0.200 
+        self._std_velocity = 0.0350
 
     def initiate(self, measurement):
         """Create track from unassociated measurement.

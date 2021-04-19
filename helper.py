@@ -171,13 +171,13 @@ def _test_tracker_online(path2det, path2video, slice_start, slice_end, det_in, f
             tracker.onlineTrackerInit(boxes_nms)
             continue
  
-        matches, unmatched_track_ids, unmatched_det_ids = tracker.onlineTrackerAssign(boxes_nms)
+        matches, unmatched_track_ids, unmatched_det_ids = tracker.onlineTrackerAssign(boxes_nms, index-slice_start+1)
 
-        for t in unmatched_track_ids:
-            print ('[%d] unmatched track idx %d'%(index-slice_start+1, t))
+        # for t in unmatched_track_ids:
+        #     print ('[%d] unmatched track id %d' % (index-slice_start+1, tracker.tracks[t].id))
 
-        for d in unmatched_det_ids:
-            print ('[%d] unmatched det idx %d'%(index-slice_start+1, d))
+        # for d in unmatched_det_ids:
+        #     print ('[%d] unmatched det idx %d'%(index-slice_start+1, d))
 
         lines = []
         for match in matches:
