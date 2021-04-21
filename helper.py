@@ -224,6 +224,9 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
     last_frame = ""
     wc_d = {}
 
+    # online tracker to extract motion model
+    tracker = OnlineTracker()
+
     for index in range(slice_start, slice_end):
         frame = video[index]
 
@@ -299,6 +302,22 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
                 
         for i,node in enumerate(node_lst):
             node._hist = tools.calc_RGB_histogram(bbimgs[i], node._mask)
+
+        if fnum == 1:
+            tracker.onlineTrackerInit(boxes_nms)
+        else:
+            matches, _, _ = tracker.onlineTrackerAssign(boxes_nms, index-slice_start+1)
+
+            for match in matches:
+                tidx, didx = match[0], match[1]
+                dnode, track = node_lst[didx], tracker.tracks[tidx]
+                
+                dnode._observed = True
+                dnode._kf = track.kf
+                dnode._mean = track.mean
+                dnode._covar = track.covariance
+
+            tracker.onlineTrackerUpdate(matches, boxes_nms)
 
         input_data[image_name] = node_lst
 

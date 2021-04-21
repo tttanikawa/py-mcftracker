@@ -3,6 +3,7 @@ import numpy as np
 import KalmanFilter
 
 from scipy.optimize import linear_sum_assignment
+import utils
 
 class OnlineTracker:
 
@@ -18,7 +19,7 @@ class OnlineTracker:
             self.tracks.append(OnlineTrack(self._next_id, mean, cov, new_kf))
             self._next_id += 1
 
-        print ('%d tracks created' % (len(self.tracks)))
+        # print ('%d tracks created' % (len(self.tracks)))
 
         return
 
@@ -56,8 +57,8 @@ class OnlineTracker:
             if j not in col_indices:
                 unmatched_dets.append(j)
 
-        for tidx in unmatched_tracks:
-            print ('f:%d id:%d unmatched' % (fnum, self.tracks[tidx].id))
+        # for tidx in unmatched_tracks:
+        #     print ('f:%d id:%d unmatched' % (fnum, self.tracks[tidx].id))
 
         return matches, unmatched_tracks, unmatched_dets
 

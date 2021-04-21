@@ -148,32 +148,32 @@ class KalmanFilter(object):
         return new_mean, new_covariance
 
     def gating_distance(self, mean, covariance, pos):
-            """Compute gating distance between state distribution and measurements.
+        """Compute gating distance between state distribution and measurements.
 
-            A suitable distance threshold can be obtained from `chi2inv95`. If
-            `only_position` is False, the chi-square distribution has 4 degrees of
-            freedom, otherwise 2.
+        A suitable distance threshold can be obtained from `chi2inv95`. If
+        `only_position` is False, the chi-square distribution has 4 degrees of
+        freedom, otherwise 2.
 
-            Parameters
-            ----------
-            mean : ndarray
-                Mean vector over the state distribution (4 dimensional).
-            covariance : ndarray
-                Covariance of the state distribution (4x4 dimensional).
-            pos : ndarray
+        Parameters
+        ----------
+        mean : ndarray
+            Mean vector over the state distribution (4 dimensional).
+        covariance : ndarray
+            Covariance of the state distribution (4x4 dimensional).
+        pos : ndarray
 
-            Returns
-            -------
-            ndarray
-            """
+        Returns
+        -------
+        ndarray
+        """
 
-            mean, covariance = self.project(mean, covariance)
-            
-            cholesky_factor = np.linalg.cholesky(covariance)
-            d = pos - mean
-            z = scipy.linalg.solve_triangular(
-                cholesky_factor, d.T, lower=True, check_finite=False,
-                overwrite_b=True)
-            squared_maha = np.sum(z * z, axis=0)
-            
-            return squared_maha
+        mean, covariance = self.project(mean, covariance)
+        
+        cholesky_factor = np.linalg.cholesky(covariance)
+        d = pos - mean
+        z = scipy.linalg.solve_triangular(
+            cholesky_factor, d.T, lower=True, check_finite=False,
+            overwrite_b=True)
+        squared_maha = np.sum(z * z, axis=0)
+        
+        return squared_maha

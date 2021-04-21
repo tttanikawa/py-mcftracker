@@ -3,10 +3,12 @@ class GraphNode:
         self._3dc = wc
         self._bb = bb
         self._score = score
-        # self._is_occl = is_occl
-        # self._is_complex = is_complex
         self._status = status
         self._feat = feat_v
         self._mask = mask
         self._hist = hist
-        # self._image = image
+        
+        self._observed = False
+        self._mean = None
+        self._covar = None
+        self._kf = None
