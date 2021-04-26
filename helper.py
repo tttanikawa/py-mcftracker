@@ -25,6 +25,9 @@ from node import GraphNode
 from scipy import interpolate
 from bbox import Box
 
+from pfe.torchreid.utils import FeatureExtractor
+from pfe.scripts.extract_fetures import network_feed_from_list
+
 sys.path.append("../")
 from maskrcnn_mmdet.demo.inference_mask import init_segmentor, get_masks_from_image_lst
 
@@ -195,12 +198,21 @@ def _test_tracker_online(path2det, path2video, slice_start, slice_end, det_in, f
     return [], transform, size
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
-                        min_confidence=0.4, max_iou=0.98):
+                        # min_confidence=0.4, max_iou=0.98, segment=False, ckpt_path='/root/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
+                        min_confidence=0.4, max_iou=0.98, segment=False, ckpt_path='/home/bepro/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
     
     input_data = {}
     video = mmcv.VideoReader(path2video)
 
-    segmentor = init_segmentor()
+    if segment:
+        segmentor = init_segmentor()
+    else:
+        extractor = FeatureExtractor(
+            model_name='osnet_x1_0',
+            model_path=ckpt_path,
+            device='cuda'
+        )
+
     match_video = MatchVideo.load(match_video_id)
 
     transform = Transform(
@@ -291,17 +303,23 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
         if len(bbimgs) == 0:
             print ('no images')
             continue
-        
-        masks = get_masks_from_image_lst(segmentor, bbimgs)
-        masks_p = utils.preprocess_masks(masks, bbimgs)
 
-        for m in masks_p:
-            idx = m[0]
-            mask = m[1]
-            node_lst[idx]._mask = mask
-                
-        for i,node in enumerate(node_lst):
-            node._hist = tools.calc_RGB_histogram(bbimgs[i], node._mask)
+        if segment:    
+            masks = get_masks_from_image_lst(segmentor, bbimgs)
+            masks_p = utils.preprocess_masks(masks, bbimgs)
+
+            for m in masks_p:
+                idx = m[0]
+                mask = m[1]
+                node_lst[idx]._mask = mask
+                    
+            for i,node in enumerate(node_lst):
+                node._hist = tools.calc_RGB_histogram(bbimgs[i], node._mask)
+
+        else:
+            feats = network_feed_from_list(bbimgs, extractor)
+            for i,node in enumerate(node_lst):
+                node._feat = feats[i]
 
         if fnum == 1:
             tracker.onlineTrackerInit(boxes_nms)

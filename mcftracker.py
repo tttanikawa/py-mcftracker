@@ -39,7 +39,7 @@ class MinCostFlowTracker:
         
         self._fib_cache = {0: 0, 1: 1}
         
-        self._npast = 60
+        self._npast = 30
         self._penalty_skp = 10
 
     def _fib(self, n):
@@ -81,11 +81,16 @@ class MinCostFlowTracker:
         else:
             return 10000
     
-    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.4, thresh=9.4877):
-        u = prev_node._hist
-        v = cur_node._hist
+    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.4, thresh=16., segment=False):
 
-        prob_color = 1.0-tools.calc_bhattacharyya_distance(u, v) 
+        if segment: 
+            u = prev_node._hist
+            v = cur_node._hist
+            prob_color = 1.0-tools.calc_bhattacharyya_distance(u, v) 
+        else:
+            u = prev_node._feat
+            v = cur_node._feat            
+            prob_color = cosine_similarity([u],[v])[0][0]
 
         if prev_node._observed:
             u_mean = prev_node._mean
@@ -94,14 +99,12 @@ class MinCostFlowTracker:
 
             sqmah_dist = u_kf.gating_distance(u_mean, u_cov, cur_node._3dc)
             
-            if sqmah_dist > 16.:
+            if sqmah_dist > thresh:
                 return -1 
             
-            prob_dst = 1.0 - sqmah_dist / 16.
-
-            prob_sim = 0.8*prob_dst + 0.2*prob_color
-            prob_sim = prob_dst
-
+            prob_dst = 1.0 - sqmah_dist / thresh
+            prob_sim = 0.7*prob_dst + 0.3*prob_color
+            
         else:
             pxy = (prev_node._3dc[0], prev_node._3dc[1])
             cxy = (cur_node._3dc[0], cur_node._3dc[1])
