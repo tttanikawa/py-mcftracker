@@ -81,7 +81,7 @@ class MinCostFlowTracker:
         else:
             return 10000
     
-    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.4, thresh=16., segment=False):
+    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.4, thresh=16., segment=True):
 
         if segment: 
             u = prev_node._hist
@@ -140,7 +140,7 @@ class MinCostFlowTracker:
 
             frame_id = self._name2id[image_name]
 
-            pnlty_en = 1 if frame_id == 0 else 100
+            pnlty_en = 1 if frame_id == 0 else 500
             
             for i, node in enumerate(node_lst):
                 self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_factor * pnlty_en))

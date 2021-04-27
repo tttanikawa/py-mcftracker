@@ -199,7 +199,7 @@ def _test_tracker_online(path2det, path2video, slice_start, slice_end, det_in, f
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
                         # min_confidence=0.4, max_iou=0.98, segment=False, ckpt_path='/root/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
-                        min_confidence=0.4, max_iou=0.98, segment=False, ckpt_path='/home/bepro/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
+                        min_confidence=0.4, max_iou=0.98, segment=True, ckpt_path='/home/bepro/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
     
     input_data = {}
     video = mmcv.VideoReader(path2video)
@@ -324,7 +324,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
         if fnum == 1:
             tracker.onlineTrackerInit(boxes_nms)
         else:
-            matches, _, _ = tracker.onlineTrackerAssign(boxes_nms, index-slice_start+1)
+            matches, _, undet_idx = tracker.onlineTrackerAssign(boxes_nms, index-slice_start+1)
 
             for match in matches:
                 tidx, didx = match[0], match[1]
@@ -334,6 +334,12 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
                 dnode._kf = track.kf
                 dnode._mean = track.mean
                 dnode._covar = track.covariance
+            
+            # init new track for unmatched dets
+            unmatched_boxes = [boxes_nms[i] for i in undet_idx]
+            
+            if len(unmatched_boxes)>0:
+                tracker.onlineTrackerInit(unmatched_boxes)
 
             tracker.onlineTrackerUpdate(matches, boxes_nms)
 
