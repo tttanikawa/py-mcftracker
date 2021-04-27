@@ -198,8 +198,7 @@ def _test_tracker_online(path2det, path2video, slice_start, slice_end, det_in, f
     return [], transform, size
 
 def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_indices, match_video_id,
-                        # min_confidence=0.4, max_iou=0.98, segment=False, ckpt_path='/root/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
-                        min_confidence=0.4, max_iou=0.98, segment=True, ckpt_path='/home/bepro/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
+                        min_confidence=0.4, max_iou=0.98, segment=True, ckpt_path='/root/py-mcftracker/pfe/checkpoints/market_combined_120e.pth'):
     
     input_data = {}
     video = mmcv.VideoReader(path2video)
