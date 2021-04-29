@@ -300,7 +300,7 @@ def read_input_data(path2det, path2video, slice_start, slice_end, det_in, frame_
         wc_d[index] = _wc.copy()
 
         if len(bbimgs) == 0:
-            print ('no images')
+            print ('[index %d] empty detection list fnum %d' % (index,fnum))
             continue
 
         if segment:    
