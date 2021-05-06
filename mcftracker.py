@@ -81,7 +81,7 @@ class MinCostFlowTracker:
         else:
             return 10000
     
-    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.4, thresh=16., segment=True):
+    def _calc_cost_link_appearance(self, prev_node, cur_node, transform, size, dbgLog=False, dst_max=2.4, segment=True):
 
         if segment: 
             u = prev_node._hist
@@ -92,31 +92,33 @@ class MinCostFlowTracker:
             v = cur_node._feat            
             prob_color = cosine_similarity([u],[v])[0][0]
 
+        pxy = (prev_node._3dc[0], prev_node._3dc[1])
+        cxy = (cur_node._3dc[0], cur_node._3dc[1])
+
+        a = np.array(pxy)
+        b = np.array(cxy)
+
+        dst_eucl = np.linalg.norm(a-b)
+
+        if dst_eucl >= dst_max:
+            return -1
+
         if prev_node._observed:
             u_mean = prev_node._mean
             u_cov = prev_node._covar
             u_kf = prev_node._kf
 
             sqmah_dist = u_kf.gating_distance(u_mean, u_cov, cur_node._3dc)
-            
-            if sqmah_dist > thresh:
-                return -1 
-            
-            prob_dst = 1.0 - sqmah_dist / thresh
-            prob_sim = 0.7*prob_dst + 0.3*prob_color
-            
-        else:
-            pxy = (prev_node._3dc[0], prev_node._3dc[1])
-            cxy = (cur_node._3dc[0], cur_node._3dc[1])
 
-            a = np.array(pxy)
-            b = np.array(cxy)
-
-            dst_eucl = np.linalg.norm(a-b)
-            prob_dst = np.float32(1.0 - dst_eucl / dst_max)
-
-            if dst_eucl >= dst_max:
+            if prob_color == 0:
                 return -1
+
+            cost_colour = -math.log(prob_color)
+            cost = sqmah_dist + cost_colour*1000
+
+            return cost
+        else:
+            prob_dst = np.float32(1.0 - dst_eucl / dst_max)
 
             bu = prev_node._bb
             bv = cur_node._bb
@@ -129,7 +131,9 @@ class MinCostFlowTracker:
                 c1, c2, c3 = 0.2, 0.8, 0.0
                 prob_sim = c1*prob_dst + c2*prob_color + c3*prob_iou
 
-        return -math.log(prob_sim)
+            return -math.log(prob_sim) * 1000
+
+        return -1
 
     def build_network(self, last_img_name, transform, size, f2i_factor=100000):
         self.mcf = pywrapgraph.SimpleMinCostFlow()
@@ -140,7 +144,7 @@ class MinCostFlowTracker:
 
             frame_id = self._name2id[image_name]
 
-            pnlty_en = 1 if frame_id == 0 else 500
+            pnlty_en = 1 if frame_id == 0 else 100
             
             for i, node in enumerate(node_lst):
                 self.mcf.AddArcWithCapacityAndUnitCost(self._node2id["source"], self._node2id[(image_name, i, "u")], 1, int(self._calc_cost_enter() * f2i_factor * pnlty_en))
@@ -154,7 +158,7 @@ class MinCostFlowTracker:
                     for j, j_node in enumerate(node_lst):
                         unit_cost = self._calc_cost_link_appearance(i_node, j_node, transform, size)
                         if unit_cost >= 0.:
-                            self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_image_name, i, "v")], self._node2id[(image_name, j, "u")], 1, int(unit_cost*1000))
+                            self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(prev_image_name, i, "v")], self._node2id[(image_name, j, "u")], 1, int(unit_cost))
 
                 # connect N previous frames to current frame's nodes
                 if frame_id >= 2:
@@ -166,7 +170,7 @@ class MinCostFlowTracker:
                             for j, j_node in enumerate(node_lst):
                                 unit_cost = self._calc_cost_link_appearance(i_node, j_node, transform, size)
                                 if unit_cost >= 0.:
-                                    self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(fpast, i, "v")], self._node2id[(image_name, j, "u")], 1, int(unit_cost*1000*self._penalty_skp))
+                                    self.mcf.AddArcWithCapacityAndUnitCost(self._node2id[(fpast, i, "v")], self._node2id[(image_name, j, "u")], 1, int(unit_cost*self._penalty_skp))
 
         return
 
