@@ -114,7 +114,8 @@ class MinCostFlowTracker:
                 return -1
 
             cost_colour = -math.log(prob_color)
-            cost = sqmah_dist + cost_colour*1000
+            # cost = sqmah_dist + cost_colour*1000
+            cost = sqmah_dist
 
             return cost
         else:
